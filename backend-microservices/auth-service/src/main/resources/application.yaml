@@ -1,0 +1,9 @@
+server:
+  port: 8081 # Port ngẫu nhiên hoặc tự set
+
+spring:
+  profiles:
+    active=${SPRING_PROFILES_ACTIVE:dev}
+  servlet:
+    multipart:
+      enabled=true
