@@ -9,3 +9,13 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+
+# --- CẤU HÌNH GỘP SWAGGER ---
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: Auth Service
+        url: /aggregate/auth-service/v3/api-docs
+      - name: User Service
+        url: /aggregate/user-service/v3/api-docs

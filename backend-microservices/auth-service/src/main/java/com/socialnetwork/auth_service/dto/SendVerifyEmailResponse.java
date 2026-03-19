@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class SendVerifyEmailResponse {
-    private String message;
-    private String code;
+  private String message;
+  private String code;
 }

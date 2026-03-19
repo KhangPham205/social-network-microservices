@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # 1. Database ĐỘC LẬP cho Auth Service (Port 5432)
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: postgres_auth
+    restart: always
+    ports:
+      - "5432:5432" # Chạy ở cổng 5432
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: auth_db # Tự động tạo DB tên là auth_db
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 2. Database ĐỘC LẬP cho User Service (Port 5433)
+  postgres-user:
+    image: postgres:15-alpine
+    container_name: postgres_user
+    restart: always
+    ports:
+      - "5433:5432" # Ánh xạ ra ngoài máy bạn là cổng 5433
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user_db # Tự động tạo DB tên là user_db
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 3. pgAdmin (Quản lý chung cả 2 DB)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: social_network_pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@social.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      - postgres-auth
+      - postgres-user
+    networks:
+      - social-network-net
+
+# Chia làm 2 ổ cứng ảo riêng biệt để lưu dữ liệu
+volumes:
+  auth_db_data:
+  user_db_data:
+
+networks:
+  social-network-net:
+    driver: bridge

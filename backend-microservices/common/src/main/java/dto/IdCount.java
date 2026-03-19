@@ -1,6 +1,7 @@
 package dto;
 
 public interface IdCount {
-    String getId();
-    Long getCount();
+  String getId();
+
+  Long getCount();
 }

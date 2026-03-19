@@ -1,4 +1,3 @@
 package dto;
 
-public class ApiResponse {
-}
+public class ApiResponse {}

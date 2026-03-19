@@ -6,7 +6,5 @@ import lombok.Data;
 
 @Data
 public class SendVerifyEmailRequest {
-    @NotBlank
-    @Email
-    private String email;
+  @NotBlank @Email private String email;
 }

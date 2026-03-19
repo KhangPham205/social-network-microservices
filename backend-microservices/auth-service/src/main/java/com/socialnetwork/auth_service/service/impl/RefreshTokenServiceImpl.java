@@ -1,90 +1,84 @@
 package com.socialnetwork.auth_service.service.impl;
 
-import com.kt.social.auth.dto.RefreshTokenRequest;
-import com.kt.social.auth.dto.LoginResponse;
-import com.kt.social.auth.dto.TokenResponse;
-import com.kt.social.auth.model.RefreshToken;
-import com.kt.social.auth.model.Role;
-import com.kt.social.auth.model.UserCredential;
-import com.kt.social.auth.repository.RefreshTokenRepository;
-import com.kt.social.auth.security.JwtProvider;
-import com.kt.social.auth.service.RefreshTokenService;
-import com.kt.social.common.exception.BadRequestException;
+import com.socialnetwork.auth_service.dto.RefreshTokenRequest;
+import com.socialnetwork.auth_service.dto.TokenResponse;
+import com.socialnetwork.auth_service.model.RefreshToken;
+import com.socialnetwork.auth_service.model.Role;
+import com.socialnetwork.auth_service.model.UserCredential;
+import com.socialnetwork.auth_service.repository.RefreshTokenRepository;
+import com.socialnetwork.auth_service.security.JwtProvider;
+import com.socialnetwork.auth_service.service.RefreshTokenService;
+import exception.BadRequestException;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RefreshTokenServiceImpl implements RefreshTokenService {
 
-    private final JwtProvider jwtProvider;
-    private final RefreshTokenRepository refreshTokenRepository;
+  private final JwtProvider jwtProvider;
+  private final RefreshTokenRepository refreshTokenRepository;
 
-    @Value("${jwt.refresh.expiration}")
-    private Long refreshExpiration;
+  @Value("${jwt.refresh.expiration}")
+  private Long refreshExpiration;
 
-    @Override
-    public Optional<RefreshToken> findByToken(String token) {
-        return refreshTokenRepository.findByToken(token);
+  @Override
+  public Optional<RefreshToken> findByToken(String token) {
+    return refreshTokenRepository.findByToken(token);
+  }
+
+  @Override
+  public TokenResponse refresh(RefreshTokenRequest request) {
+    String refreshToken = request.getRefreshToken();
+
+    RefreshToken token =
+        refreshTokenRepository
+            .findByToken(refreshToken)
+            .orElseThrow(
+                () -> new BadRequestException("Invalid refresh token. Please log in again."));
+
+    if (token.getExpiryDate().isBefore(Instant.now())) {
+      refreshTokenRepository.delete(token);
+      throw new BadRequestException("Invalid or expired code");
     }
 
-    @Override
-    public TokenResponse refresh(RefreshTokenRequest request) {
-        String refreshToken = request.getRefreshToken();
+    UserCredential userCredential = token.getUser();
 
-        RefreshToken token = refreshTokenRepository.findByToken(refreshToken)
-                .orElseThrow(() -> new BadRequestException("Invalid refresh token. Please log in again."));
+    Set<Role> roles = userCredential.getRoles();
+    String[] roleNames = roles.stream().map(Role::getName).toArray(String[]::new);
 
-        if (token.getExpiryDate().isBefore(Instant.now())) {
-            refreshTokenRepository.delete(token);
-            throw new BadRequestException("Invalid or expired code");
-        }
+    UserDetails userDetails =
+        User.builder()
+            .username(userCredential.getUsername())
+            .password(userCredential.getPassword())
+            .roles(roleNames)
+            .build();
 
-        var userCredential = token.getUser();
+    // Get userId from userCredential
+    Long realUserId = userCredential.getId();
 
-        Set<Role> roles = userCredential.getRoles();
-        String[] roleNames = roles.stream()
-                .map(Role::getName)
-                .toArray(String[]::new);
+    String newAccessToken = jwtProvider.generateToken(userDetails, realUserId);
 
-        UserDetails userDetails = User.builder()
-                .username(userCredential.getUsername())
-                .password(userCredential.getPassword())
-                .roles(roleNames)
-                .build();
+    return TokenResponse.builder().accessToken(newAccessToken).refreshToken(refreshToken).build();
+  }
 
-        com.kt.social.domain.user.model.User userProfile = userCredential.getUser();
-
-        // 2. Kiểm tra
-        if (userProfile == null) {
-            throw new IllegalStateException("Tài khoản " + userCredential.getUsername() + " không có User profile liên kết.");
-        }
-
-        Long realUserId = userProfile.getId();
-
-        String newAccessToken = jwtProvider.generateToken(userDetails, realUserId);
-
-        return TokenResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(refreshToken)
-                .build();
-    }
-
-    @Override
-    public RefreshToken createRefreshToken(UserCredential user) {
-        RefreshToken refreshToken = RefreshToken.builder()
-                .user(user)
-                .token(UUID.randomUUID().toString())
-                .expiryDate(Instant.now().plusSeconds(refreshExpiration))
-                .build();
-        return refreshTokenRepository.save(refreshToken);
-    }
+  @Override
+  public RefreshToken createRefreshToken(UserCredential user) {
+    RefreshToken refreshToken =
+        RefreshToken.builder()
+            .user(user)
+            .token(UUID.randomUUID().toString())
+            .expiryDate(Instant.now().plusSeconds(refreshExpiration))
+            .build();
+    return refreshTokenRepository.save(refreshToken);
+  }
 }
