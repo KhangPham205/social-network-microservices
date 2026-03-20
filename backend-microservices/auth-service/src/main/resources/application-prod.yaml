@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    # Render sẽ bơm DB_URL thật vào đây, nếu chạy ở máy bạn thì nó tự lấy localhost
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/auth_db}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    # Giấu email và password đi
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+jwt:
+  # Cực kỳ quan trọng: Giấu chuỗi Secret này đi
+  secret: ${JWT_SECRET}
+  expiration: 86400000
+  refresh:
+    expiration: 604800000

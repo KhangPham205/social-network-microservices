@@ -13,7 +13,8 @@ public class HttpInterfaceConfig {
 
   // Nhờ Spring tiêm đúng cái "microserviceBuilder" từ bên RestClientConfig sang đây
   @Bean
-  public UserServiceClient userServiceClient(@Qualifier("microserviceBuilder") RestClient.Builder builder) {
+  public UserServiceClient userServiceClient(
+      @Qualifier("microserviceBuilder") RestClient.Builder builder) {
     RestClient restClient = builder.baseUrl("http://user-service").build();
     RestClientAdapter adapter = RestClientAdapter.create(restClient);
     HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();

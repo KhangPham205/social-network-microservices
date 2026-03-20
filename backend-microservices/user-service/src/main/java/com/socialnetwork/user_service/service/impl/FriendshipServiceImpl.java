@@ -1,7 +1,6 @@
 package com.socialnetwork.user_service.service.impl;
 
 import com.socialnetwork.user_service.dto.FriendshipResponse;
-import com.socialnetwork.user_service.dto.UserProfileDto;
 import com.socialnetwork.user_service.dto.UserRelationDto;
 import com.socialnetwork.user_service.events.FriendshipAcceptedEvent;
 import com.socialnetwork.user_service.events.FriendshipDeletedEvent;
@@ -16,6 +15,9 @@ import com.socialnetwork.user_service.utils.BlockUtils;
 import exception.AccessDeniedException;
 import exception.BadRequestException;
 import exception.ResourceNotFoundException;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -23,13 +25,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import service.BaseFilterService;
 import vo.PageVO;
 import vo.friendship.FriendshipStatus;
-
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -51,20 +48,24 @@ public class FriendshipServiceImpl implements FriendshipService {
   @Override
   @Transactional
   public FriendshipResponse sendRequest(Long userId, Long targetId) {
-    if (userId.equals(targetId)) throw new BadRequestException("You cannot send a friend request to yourself");
+    if (userId.equals(targetId))
+      throw new BadRequestException("You cannot send a friend request to yourself");
     if (blockUtils.isBlocked(userId, targetId) || blockUtils.isBlocked(targetId, userId))
       throw new BadRequestException("Cannot send request — one of you has blocked the other");
 
     User sender = getUser(userId);
     User receiver = getUser(targetId);
 
-    Optional<Friendship> existing = friendshipRepository.findBySenderAndReceiver(sender, receiver)
-        .or(() -> friendshipRepository.findBySenderAndReceiver(receiver, sender));
+    Optional<Friendship> existing =
+        friendshipRepository
+            .findBySenderAndReceiver(sender, receiver)
+            .or(() -> friendshipRepository.findBySenderAndReceiver(receiver, sender));
 
     if (existing.isPresent()) {
       Friendship f = existing.get();
       switch (f.getStatus()) {
-        case BLOCKED -> throw new BadRequestException("You cannot send a request to a blocked user");
+        case BLOCKED ->
+            throw new BadRequestException("You cannot send a request to a blocked user");
         case PENDING -> throw new BadRequestException("Friend request already pending");
         case FRIEND -> throw new BadRequestException("You are already friends");
         case REJECTED -> {
@@ -72,24 +73,33 @@ public class FriendshipServiceImpl implements FriendshipService {
           f.setReceiver(receiver);
           f.setStatus(FriendshipStatus.PENDING);
           friendshipRepository.save(f);
-          return new FriendshipResponse("Friend request re-sent", FriendshipStatus.PENDING, userId, targetId);
+          return new FriendshipResponse(
+              "Friend request re-sent", FriendshipStatus.PENDING, userId, targetId);
         }
       }
     }
 
-    friendshipRepository.save(Friendship.builder().sender(sender).receiver(receiver).status(FriendshipStatus.PENDING).build());
+    friendshipRepository.save(
+        Friendship.builder()
+            .sender(sender)
+            .receiver(receiver)
+            .status(FriendshipStatus.PENDING)
+            .build());
 
     // TODO Microservices: Bắn event để Notification-Service nhận (qua Kafka)
-    // eventPublisher.publishEvent(new NotificationEvent(sender.getId(), receiver.getId(), "FRIEND_REQUEST"));
+    // eventPublisher.publishEvent(new NotificationEvent(sender.getId(), receiver.getId(),
+    // "FRIEND_REQUEST"));
 
-    return new FriendshipResponse("Friend request sent", FriendshipStatus.PENDING, userId, targetId);
+    return new FriendshipResponse(
+        "Friend request sent", FriendshipStatus.PENDING, userId, targetId);
   }
 
   @Override
   @Transactional
   public FriendshipResponse acceptRequest(Long senderId, Long receiverId) {
     Friendship f = getFriendship(senderId, receiverId);
-    if (f.getStatus() != FriendshipStatus.PENDING) throw new BadRequestException("Cannot approve a request that does not have status PENDING");
+    if (f.getStatus() != FriendshipStatus.PENDING)
+      throw new BadRequestException("Cannot approve a request that does not have status PENDING");
     if (blockUtils.isBlocked(senderId, receiverId) || blockUtils.isBlocked(receiverId, senderId))
       throw new BadRequestException("Cannot send request — one of you has blocked the other");
 
@@ -108,16 +118,19 @@ public class FriendshipServiceImpl implements FriendshipService {
     // Bắn Event để Message-Service tạo Conversation & Notification-Service tạo thông báo
     eventPublisher.publishEvent(new FriendshipAcceptedEvent(senderId, receiverId));
 
-    return new FriendshipResponse("Friend request accepted", FriendshipStatus.FRIEND, senderId, receiverId);
+    return new FriendshipResponse(
+        "Friend request accepted", FriendshipStatus.FRIEND, senderId, receiverId);
   }
 
   @Override
   @Transactional
   public FriendshipResponse rejectRequest(Long senderId, Long receiverId) {
     Friendship f = getFriendship(senderId, receiverId);
-    if (f.getStatus() != FriendshipStatus.PENDING) throw new BadRequestException("Cannot reject a request that does not have status PENDING");
+    if (f.getStatus() != FriendshipStatus.PENDING)
+      throw new BadRequestException("Cannot reject a request that does not have status PENDING");
     friendshipRepository.delete(f);
-    return new FriendshipResponse("Friend request rejected", FriendshipStatus.REJECTED, senderId, receiverId);
+    return new FriendshipResponse(
+        "Friend request rejected", FriendshipStatus.REJECTED, senderId, receiverId);
   }
 
   @Override
@@ -129,7 +142,8 @@ public class FriendshipServiceImpl implements FriendshipService {
 
     Optional<Friendship> f1 = friendshipRepository.findBySenderAndReceiver(u1, u2);
     Optional<Friendship> f2 = friendshipRepository.findBySenderAndReceiver(u2, u1);
-    if (f1.isEmpty() && f2.isEmpty()) throw new ResourceNotFoundException("Not friends with this user");
+    if (f1.isEmpty() && f2.isEmpty())
+      throw new ResourceNotFoundException("Not friends with this user");
 
     f1.ifPresent(friendshipRepository::delete);
     f2.ifPresent(friendshipRepository::delete);
@@ -137,7 +151,8 @@ public class FriendshipServiceImpl implements FriendshipService {
     userRelaRepository.deleteByFollowerAndFollowing(u2, u1);
 
     eventPublisher.publishEvent(new FriendshipDeletedEvent(userId, friendId));
-    return new FriendshipResponse("Unfriended successfully", FriendshipStatus.REJECTED, userId, friendId);
+    return new FriendshipResponse(
+        "Unfriended successfully", FriendshipStatus.REJECTED, userId, friendId);
   }
 
   @Override
@@ -147,39 +162,57 @@ public class FriendshipServiceImpl implements FriendshipService {
     User user = getUser(userId);
     User target = getUser(targetId);
 
-    friendshipRepository.findBySenderAndReceiver(user, target).ifPresent(friendshipRepository::delete);
-    friendshipRepository.findBySenderAndReceiver(target, user).ifPresent(friendshipRepository::delete);
+    friendshipRepository
+        .findBySenderAndReceiver(user, target)
+        .ifPresent(friendshipRepository::delete);
+    friendshipRepository
+        .findBySenderAndReceiver(target, user)
+        .ifPresent(friendshipRepository::delete);
     userRelaRepository.deleteByFollowerAndFollowing(user, target);
     userRelaRepository.deleteByFollowerAndFollowing(target, user);
 
-    Friendship f = friendshipRepository.findBySenderAndReceiver(user, target)
-        .orElse(Friendship.builder().sender(user).receiver(target).build());
+    Friendship f =
+        friendshipRepository
+            .findBySenderAndReceiver(user, target)
+            .orElse(Friendship.builder().sender(user).receiver(target).build());
     f.setStatus(FriendshipStatus.BLOCKED);
     friendshipRepository.save(f);
 
     eventPublisher.publishEvent(new FriendshipDeletedEvent(userId, targetId));
-    return new FriendshipResponse("User blocked successfully", FriendshipStatus.BLOCKED, userId, targetId);
+    return new FriendshipResponse(
+        "User blocked successfully", FriendshipStatus.BLOCKED, userId, targetId);
   }
 
   @Override
   @Transactional
   public FriendshipResponse unblockUser(Long userId, Long targetId) {
-    Friendship friendship = friendshipRepository.findBySenderAndReceiver(getUser(userId), getUser(targetId))
-        .orElseThrow(() -> new ResourceNotFoundException("No blocked relationship found"));
-    if (friendship.getStatus() != FriendshipStatus.BLOCKED) throw new BadRequestException("This user is not blocked");
+    Friendship friendship =
+        friendshipRepository
+            .findBySenderAndReceiver(getUser(userId), getUser(targetId))
+            .orElseThrow(() -> new ResourceNotFoundException("No blocked relationship found"));
+    if (friendship.getStatus() != FriendshipStatus.BLOCKED)
+      throw new BadRequestException("This user is not blocked");
     friendshipRepository.delete(friendship);
-    return new FriendshipResponse("User unblocked successfully", FriendshipStatus.REJECTED, userId, targetId);
+    return new FriendshipResponse(
+        "User unblocked successfully", FriendshipStatus.REJECTED, userId, targetId);
   }
 
   @Override
   @Transactional
   public FriendshipResponse unsendRequest(Long userId, Long targetId) {
-    Friendship f = friendshipRepository.findBySenderAndReceiver(getUser(userId), getUser(targetId))
-        .or(() -> friendshipRepository.findBySenderAndReceiver(getUser(targetId), getUser(userId)))
-        .orElseThrow(() -> new ResourceNotFoundException("No friend request found"));
+    Friendship f =
+        friendshipRepository
+            .findBySenderAndReceiver(getUser(userId), getUser(targetId))
+            .or(
+                () ->
+                    friendshipRepository.findBySenderAndReceiver(
+                        getUser(targetId), getUser(userId)))
+            .orElseThrow(() -> new ResourceNotFoundException("No friend request found"));
 
-    if (!f.getSender().getId().equals(userId)) throw new AccessDeniedException("You cannot unsend a request you didn’t send");
-    if (f.getStatus() != FriendshipStatus.PENDING) throw new BadRequestException("Cannot unsend a request that is not pending");
+    if (!f.getSender().getId().equals(userId))
+      throw new AccessDeniedException("You cannot unsend a request you didn’t send");
+    if (f.getStatus() != FriendshipStatus.PENDING)
+      throw new BadRequestException("Cannot unsend a request that is not pending");
 
     friendshipRepository.delete(f);
     return new FriendshipResponse("Friend request unsent", null, userId, targetId);
@@ -193,20 +226,26 @@ public class FriendshipServiceImpl implements FriendshipService {
   @Transactional(readOnly = true)
   public PageVO<UserRelationDto> getFriends(Long userId, String filter, Pageable pageable) {
     User user = getUser(userId);
-    Specification<Friendship> spec = (root, q, cb) -> cb.and(
-        cb.equal(root.get("status"), FriendshipStatus.FRIEND),
-        cb.or(cb.equal(root.get("sender"), user), cb.equal(root.get("receiver"), user))
-    );
+    Specification<Friendship> spec =
+        (root, q, cb) ->
+            cb.and(
+                cb.equal(root.get("status"), FriendshipStatus.FRIEND),
+                cb.or(cb.equal(root.get("sender"), user), cb.equal(root.get("receiver"), user)));
     // Note: Nếu bạn có custom filter, hãy nối Specification filter vào `spec` ở đây.
     Page<Friendship> page = friendshipRepository.findAll(spec, pageable);
-    return mapToPageVO(userId, page, f -> f.getSender().equals(user) ? f.getReceiver() : f.getSender());
+    return mapToPageVO(
+        userId, page, f -> f.getSender().equals(user) ? f.getReceiver() : f.getSender());
   }
 
   @Override
   @Transactional(readOnly = true)
   public PageVO<UserRelationDto> getPendingRequests(Long userId, String filter, Pageable pageable) {
     User user = getUser(userId);
-    Specification<Friendship> spec = (root, q, cb) -> cb.and(cb.equal(root.get("receiver"), user), cb.equal(root.get("status"), FriendshipStatus.PENDING));
+    Specification<Friendship> spec =
+        (root, q, cb) ->
+            cb.and(
+                cb.equal(root.get("receiver"), user),
+                cb.equal(root.get("status"), FriendshipStatus.PENDING));
     Page<Friendship> page = friendshipRepository.findAll(spec, pageable);
     return mapToPageVO(userId, page, Friendship::getSender);
   }
@@ -215,7 +254,11 @@ public class FriendshipServiceImpl implements FriendshipService {
   @Transactional(readOnly = true)
   public PageVO<UserRelationDto> getSentRequests(Long userId, String filter, Pageable pageable) {
     User user = getUser(userId);
-    Specification<Friendship> spec = (root, q, cb) -> cb.and(cb.equal(root.get("sender"), user), cb.equal(root.get("status"), FriendshipStatus.PENDING));
+    Specification<Friendship> spec =
+        (root, q, cb) ->
+            cb.and(
+                cb.equal(root.get("sender"), user),
+                cb.equal(root.get("status"), FriendshipStatus.PENDING));
     Page<Friendship> page = friendshipRepository.findAll(spec, pageable);
     return mapToPageVO(userId, page, Friendship::getReceiver);
   }
@@ -224,7 +267,11 @@ public class FriendshipServiceImpl implements FriendshipService {
   @Transactional(readOnly = true)
   public PageVO<UserRelationDto> getBlockedUsers(Long userId, String filter, Pageable pageable) {
     User user = getUser(userId);
-    Specification<Friendship> spec = (root, q, cb) -> cb.and(cb.equal(root.get("sender"), user), cb.equal(root.get("status"), FriendshipStatus.BLOCKED));
+    Specification<Friendship> spec =
+        (root, q, cb) ->
+            cb.and(
+                cb.equal(root.get("sender"), user),
+                cb.equal(root.get("status"), FriendshipStatus.BLOCKED));
     Page<Friendship> page = friendshipRepository.findAll(spec, pageable);
     return mapToPageVO(userId, page, Friendship::getReceiver);
   }
@@ -234,55 +281,74 @@ public class FriendshipServiceImpl implements FriendshipService {
   // =================================================================================
 
   private User getUser(Long id) {
-    return userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    return userRepository
+        .findById(id)
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
   }
 
   private Friendship getFriendship(Long userId1, Long userId2) {
     User u1 = getUser(userId1);
     User u2 = getUser(userId2);
-    return friendshipRepository.findBySenderAndReceiver(u1, u2)
+    return friendshipRepository
+        .findBySenderAndReceiver(u1, u2)
         .or(() -> friendshipRepository.findBySenderAndReceiver(u2, u1))
         .orElseThrow(() -> new ResourceNotFoundException("Friendship not found"));
   }
 
-  private PageVO<UserRelationDto> mapToPageVO(Long viewerId, Page<Friendship> page, Function<Friendship, User> targetExtractor) {
+  private PageVO<UserRelationDto> mapToPageVO(
+      Long viewerId, Page<Friendship> page, Function<Friendship, User> targetExtractor) {
     List<User> targets = page.getContent().stream().map(targetExtractor).toList();
     if (targets.isEmpty()) return buildEmptyPageVO(page);
 
     List<Long> targetIds = targets.stream().map(User::getId).toList();
 
     // 1. Bulk Fetch (Chỉ 3 câu Query cho toàn bộ Page)
-    Set<Long> myFollowingIds = userRelaRepository.findFollowingIdsByViewerAndTargets(viewerId, targetIds);
-    Set<Long> myFollowerIds = userRelaRepository.findFollowerIdsByViewerAndTargets(viewerId, targetIds);
-    List<Friendship> bulkFriendships = friendshipRepository.findFriendshipsBetween(viewerId, new HashSet<>(targetIds));
+    Set<Long> myFollowingIds =
+        userRelaRepository.findFollowingIdsByViewerAndTargets(viewerId, targetIds);
+    Set<Long> myFollowerIds =
+        userRelaRepository.findFollowerIdsByViewerAndTargets(viewerId, targetIds);
+    List<Friendship> bulkFriendships =
+        friendshipRepository.findFriendshipsBetween(viewerId, new HashSet<>(targetIds));
 
-    Map<Long, FriendshipResponse> friendshipMap = bulkFriendships.stream().collect(Collectors.toMap(
-        f -> f.getSender().getId().equals(viewerId) ? f.getReceiver().getId() : f.getSender().getId(),
-        f -> FriendshipResponse.from(f, viewerId),
-        (existing, replacement) -> existing
-    ));
+    Map<Long, FriendshipResponse> friendshipMap =
+        bulkFriendships.stream()
+            .collect(
+                Collectors.toMap(
+                    f ->
+                        f.getSender().getId().equals(viewerId)
+                            ? f.getReceiver().getId()
+                            : f.getSender().getId(),
+                    f -> FriendshipResponse.from(f, viewerId),
+                    (existing, replacement) -> existing));
 
     // 2. Map sang DTO
-    List<UserRelationDto> content = targets.stream().map(target -> {
-      var userInfo = target.getUserInfo();
-      String bio = (userInfo != null) ? userInfo.getBio() : null;
-      String favorites = (userInfo != null) ? userInfo.getFavorites() : null;
-      var dateOfBirth = (userInfo != null) ? userInfo.getDateOfBirth() : null;
+    List<UserRelationDto> content =
+        targets.stream()
+            .map(
+                target -> {
+                  var userInfo = target.getUserInfo();
+                  String bio = (userInfo != null) ? userInfo.getBio() : null;
+                  String favorites = (userInfo != null) ? userInfo.getFavorites() : null;
+                  var dateOfBirth = (userInfo != null) ? userInfo.getDateOfBirth() : null;
 
-      UserRelationDto dto = UserRelationDto.builder()
-          .id(target.getId())
-          .displayName(target.getDisplayName())
-          .avatarUrl(target.getAvatarUrl())
-          .bio(bio)
-          .favorites(favorites)
-          .dateOfBirth(dateOfBirth)
-          .isFollowing(myFollowingIds.contains(target.getId()))
-          .isFollowedBy(myFollowerIds.contains(target.getId()))
-          .friendship(friendshipMap.getOrDefault(target.getId(), FriendshipResponse.builder().build()))
-          .build();
+                  UserRelationDto dto =
+                      UserRelationDto.builder()
+                          .id(target.getId())
+                          .displayName(target.getDisplayName())
+                          .avatarUrl(target.getAvatarUrl())
+                          .bio(bio)
+                          .favorites(favorites)
+                          .dateOfBirth(dateOfBirth)
+                          .isFollowing(myFollowingIds.contains(target.getId()))
+                          .isFollowedBy(myFollowerIds.contains(target.getId()))
+                          .friendship(
+                              friendshipMap.getOrDefault(
+                                  target.getId(), FriendshipResponse.builder().build()))
+                          .build();
 
-      return dto;
-    }).collect(Collectors.toList());
+                  return dto;
+                })
+            .collect(Collectors.toList());
 
     return PageVO.<UserRelationDto>builder()
         .page(page.getNumber())
@@ -296,8 +362,12 @@ public class FriendshipServiceImpl implements FriendshipService {
 
   private PageVO<UserRelationDto> buildEmptyPageVO(Page<?> page) {
     return PageVO.<UserRelationDto>builder()
-        .page(page.getNumber()).size(page.getSize())
-        .totalElements(page.getTotalElements()).totalPages(page.getTotalPages())
-        .numberOfElements(0).content(List.of()).build();
+        .page(page.getNumber())
+        .size(page.getSize())
+        .totalElements(page.getTotalElements())
+        .totalPages(page.getTotalPages())
+        .numberOfElements(0)
+        .content(List.of())
+        .build();
   }
 }

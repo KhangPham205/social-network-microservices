@@ -2,7 +2,6 @@ package entity;
 
 import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
-
 import java.time.Instant;
 import lombok.*;
 import lombok.experimental.Accessors;
@@ -25,12 +24,9 @@ public class BaseEntity {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Nullable
-  @CreationTimestamp
-  private Instant createdAt;
+  @Nullable @CreationTimestamp private Instant createdAt;
 
-  @Nullable @UpdateTimestamp
-  private Instant updatedAt;
+  @Nullable @UpdateTimestamp private Instant updatedAt;
 
   @Nullable private String createdBy;
 

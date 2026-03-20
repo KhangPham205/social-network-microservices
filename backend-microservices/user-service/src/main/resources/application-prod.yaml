@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/social_network}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:123456}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+jwt:
+  # Cực kỳ quan trọng: Giấu chuỗi Secret này đi
+  secret: ${JWT_SECRET:chuoi_secret_dung_de_test_o_local_dai_dai_mot_chut}
+  expiration: 86400000
+  refresh:
+    expiration: 604800000
+
+

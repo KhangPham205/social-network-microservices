@@ -14,7 +14,7 @@ import utils.SecurityUtils;
 import vo.PageVO;
 
 @RestController
-@RequestMapping(ApiConstants.FRIENDSHIP)
+@RequestMapping("/api/users/friendship")
 @RequiredArgsConstructor
 public class FriendshipController {
 
@@ -22,43 +22,50 @@ public class FriendshipController {
   private final FriendshipService friendshipService;
 
   @PostMapping("/send")
-  public ResponseEntity<FriendshipResponse> sendRequest(@RequestParam(name = "targetId") Long targetId) {
+  public ResponseEntity<FriendshipResponse> sendRequest(
+      @RequestParam(name = "targetId") Long targetId) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.sendRequest(currentUserId, targetId));
   }
 
   @PostMapping("/unsend")
-  public ResponseEntity<FriendshipResponse> unsendRequest(@RequestParam(name = "targetId") Long targetId) {
+  public ResponseEntity<FriendshipResponse> unsendRequest(
+      @RequestParam(name = "targetId") Long targetId) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.unsendRequest(currentUserId, targetId));
   }
 
   @PostMapping("/accept")
-  public ResponseEntity<FriendshipResponse> acceptRequest(@RequestParam(name = "requesterId") Long requesterId) {
+  public ResponseEntity<FriendshipResponse> acceptRequest(
+      @RequestParam(name = "requesterId") Long requesterId) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.acceptRequest(requesterId, currentUserId));
   }
 
   @PostMapping("/reject")
-  public ResponseEntity<FriendshipResponse> rejectRequest(@RequestParam(name = "requesterId") Long requesterId) {
+  public ResponseEntity<FriendshipResponse> rejectRequest(
+      @RequestParam(name = "requesterId") Long requesterId) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.rejectRequest(requesterId, currentUserId));
   }
 
   @DeleteMapping("/unfriend")
-  public ResponseEntity<FriendshipResponse> unfriend(@RequestParam(name = "friendId") Long friendId) {
+  public ResponseEntity<FriendshipResponse> unfriend(
+      @RequestParam(name = "friendId") Long friendId) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.unfriend(currentUserId, friendId));
   }
 
   @PostMapping("/block")
-  public ResponseEntity<FriendshipResponse> blockUser(@RequestParam(name = "targetId") Long targetId) {
+  public ResponseEntity<FriendshipResponse> blockUser(
+      @RequestParam(name = "targetId") Long targetId) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.blockUser(currentUserId, targetId));
   }
 
   @DeleteMapping("/unblock")
-  public ResponseEntity<FriendshipResponse> unblockUser(@RequestParam(name = "targetId") Long targetId) {
+  public ResponseEntity<FriendshipResponse> unblockUser(
+      @RequestParam(name = "targetId") Long targetId) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.unblockUser(currentUserId, targetId));
   }
@@ -68,8 +75,7 @@ public class FriendshipController {
   @GetMapping("/sent")
   public ResponseEntity<PageVO<UserRelationDto>> getSentRequests(
       @ParameterObject Pageable pageable,
-      @RequestParam(name = "filter", required = false) String filter
-  ) {
+      @RequestParam(name = "filter", required = false) String filter) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.getSentRequests(currentUserId, filter, pageable));
   }
@@ -77,8 +83,7 @@ public class FriendshipController {
   @GetMapping
   public ResponseEntity<PageVO<UserRelationDto>> getMyFriends(
       @ParameterObject Pageable pageable,
-      @RequestParam(name = "filter", required = false) String filter
-  ) {
+      @RequestParam(name = "filter", required = false) String filter) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.getFriends(currentUserId, filter, pageable));
   }
@@ -87,16 +92,14 @@ public class FriendshipController {
   public ResponseEntity<PageVO<UserRelationDto>> getFriends(
       @PathVariable(name = "userId") Long userId,
       @ParameterObject Pageable pageable,
-      @RequestParam(name = "filter", required = false) String filter
-  ) {
+      @RequestParam(name = "filter", required = false) String filter) {
     return ResponseEntity.ok(friendshipService.getFriends(userId, filter, pageable));
   }
 
   @GetMapping("/pending")
   public ResponseEntity<PageVO<UserRelationDto>> getPendingRequests(
       @ParameterObject Pageable pageable,
-      @RequestParam(name = "filter", required = false) String filter
-  ) {
+      @RequestParam(name = "filter", required = false) String filter) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.getPendingRequests(currentUserId, filter, pageable));
   }
@@ -104,8 +107,7 @@ public class FriendshipController {
   @GetMapping("/blocked")
   public ResponseEntity<PageVO<UserRelationDto>> getBlockedUsers(
       @ParameterObject Pageable pageable,
-      @RequestParam(name = "filter", required = false) String filter
-  ) {
+      @RequestParam(name = "filter", required = false) String filter) {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(friendshipService.getBlockedUsers(currentUserId, filter, pageable));
   }

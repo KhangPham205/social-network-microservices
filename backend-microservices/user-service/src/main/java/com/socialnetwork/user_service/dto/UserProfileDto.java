@@ -1,7 +1,6 @@
 package com.socialnetwork.user_service.dto;
 
 import java.time.Instant;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

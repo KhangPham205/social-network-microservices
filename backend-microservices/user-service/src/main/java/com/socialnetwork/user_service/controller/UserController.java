@@ -29,7 +29,7 @@ public class UserController {
 
   // Xem profile của người khác
   @GetMapping("/{userId}")
-  public ResponseEntity<UserProfileDto> getUserProfile(@PathVariable Long userId) {
+  public ResponseEntity<UserProfileDto> getUserProfile(@PathVariable("userId") Long userId) {
     return ResponseEntity.ok(userService.getProfile(userId));
   }
 
@@ -42,8 +42,7 @@ public class UserController {
   @GetMapping("/search")
   public ResponseEntity<PageVO<UserRelationDto>> searchUsers(
       @RequestParam(name = "filter", required = false) String filter,
-      @ParameterObject Pageable pageable
-  ) {
+      @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(userService.searchUsers(filter, pageable));
   }
 
@@ -61,8 +60,7 @@ public class UserController {
   public ResponseEntity<PageVO<UserRelationDto>> getFollowers(
       @PathVariable(name = "id") Long id,
       @RequestParam(name = "filter", required = false) String filter,
-      @ParameterObject Pageable pageable
-  ) {
+      @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(userService.getFollowersPaged(id, filter, pageable));
   }
 
@@ -70,8 +68,7 @@ public class UserController {
   public ResponseEntity<PageVO<UserRelationDto>> getFollowing(
       @PathVariable(name = "id") Long id,
       @RequestParam(name = "filter", required = false) String filter,
-      @ParameterObject Pageable pageable
-  ) {
+      @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(userService.getFollowingPaged(id, filter, pageable));
   }
 }
