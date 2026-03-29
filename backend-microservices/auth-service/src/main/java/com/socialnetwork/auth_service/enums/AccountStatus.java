@@ -1,6 +1,7 @@
 package com.socialnetwork.auth_service.enums;
 
 public enum AccountStatus {
+  WAITING, // chờ xử lý
   PENDING, // mới đăng ký, chưa xác minh email
   ACTIVE, // đã xác minh, có thể đăng nhập
   BLOCKED, // bị khóa

@@ -41,4 +41,12 @@ public interface FriendshipRepository
       AND f.status = 'BLOCKED'
 """)
   int findBlockedUserIds(Long userId);
+
+  // Trả về true/false trực tiếp từ DB chỉ với 1 câu query
+  @Query(
+      "SELECT COUNT(f) > 0 FROM Friendship f WHERE "
+          + "((f.sender.id = :user1 AND f.receiver.id = :user2) OR "
+          + "(f.sender.id = :user2 AND f.receiver.id = :user1)) "
+          + "AND f.status = 'FRIEND'")
+  boolean existsActiveFriendship(@Param("user1") Long user1, @Param("user2") Long user2);
 }

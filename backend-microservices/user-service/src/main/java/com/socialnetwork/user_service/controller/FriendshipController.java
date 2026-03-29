@@ -4,7 +4,6 @@ import com.socialnetwork.user_service.dto.FriendshipResponse;
 import com.socialnetwork.user_service.dto.UserRelationDto;
 import com.socialnetwork.user_service.service.FriendshipService;
 import com.socialnetwork.user_service.service.UserService;
-import constants.ApiConstants;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
@@ -14,7 +13,7 @@ import utils.SecurityUtils;
 import vo.PageVO;
 
 @RestController
-@RequestMapping("/api/users/friendship")
+@RequestMapping("/api/v1/users/friendship")
 @RequiredArgsConstructor
 public class FriendshipController {
 

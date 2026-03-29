@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   # 1. Database ĐỘC LẬP cho Auth Service (Port 5432)
@@ -33,7 +32,52 @@ services:
     networks:
       - social-network-net
 
-  # 3. pgAdmin (Quản lý chung cả 2 DB)
+  # 3. Database ĐỘC LẬP cho Media Service (Port 5434)
+  postgres-media:
+    image: postgres:15-alpine
+    container_name: postgres_media
+    restart: always
+    ports:
+      - "5434:5432" # Ánh xạ ra cổng 5434 để không đụng Auth và User
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: media_db
+    volumes:
+      - media_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 4. Redis để Caching (Newsfeed, Like count)
+  redis:
+    image: redis:7.2-alpine
+    container_name: social_network_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - social-network-net
+
+  # 5. Minio để lưu trữ file (Ảnh/Video của Post)
+  minio:
+    image: minio/minio:latest
+    container_name: social_network_minio
+    restart: always
+    ports:
+      - "9000:9000" # Port API cho Spring Boot gọi vào
+      - "9001:9001" # Port giao diện Web Console (để bạn quản lý file)
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - social-network-net
+
+
+
+  # 6. pgAdmin (Quản lý chung cả 2 DB)
   pgadmin:
     image: dpage/pgadmin4
     container_name: social_network_pgadmin
@@ -49,10 +93,57 @@ services:
     networks:
       - social-network-net
 
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: social_network_kafka
+    restart: always
+    ports:
+      - "9092:9092"
+    environment:
+      # KRaft mode
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # Sửa thành localhost để tránh lỗi phân giải DNS lúc container mới nhú lên
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+
+      # --- CẤU HÌNH LẠI LISTENERS ---
+      KAFKA_LISTENERS: EXTERNAL://0.0.0.0:9092,INTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9092,INTERNAL://kafka:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      KAFKA_CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+      # (Quan trọng) Bổ sung 3 cờ này cho môi trường dev 1 broker,
+      # nếu không Kafka sẽ báo lỗi thiếu replication khi tạo các topic nội bộ
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - social-network-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: social_network_kafka_ui
+    restart: always
+    ports:
+      - "8888:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local-kraft
+      # SỬA LẠI: Kafka UI sẽ gọi qua cổng INTERNAL là 9094
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9094
+    depends_on:
+      - kafka
+    networks:
+      - social-network-net
+
 # Chia làm 2 ổ cứng ảo riêng biệt để lưu dữ liệu
 volumes:
   auth_db_data:
   user_db_data:
+  media_db_data:
+  minio_data:
 
 networks:
   social-network-net:

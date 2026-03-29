@@ -23,6 +23,25 @@ spring:
           auth: true
           starttls:
             enable: true
+  kafka:
+    bootstrap-servers: localhost:9092 # Địa chỉ của Kafka Server
+
+    # Cấu hình cho người gửi (Producer)
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+    # Cấu hình cho người nghe (Consumer) - Để nghe phản hồi từ User Service
+    consumer:
+      group-id: auth-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        # CỰC KỲ QUAN TRỌNG: Cho phép dịch JSON thành các Class nằm trong package này
+        spring.json.trusted.packages: "com.socialnetwork.shared.event.*"
+        # Bỏ qua nếu có field lạ trong JSON không map được vào Object
+        spring.json.use.type.headers: false
 
 jwt:
   # Cực kỳ quan trọng: Giấu chuỗi Secret này đi

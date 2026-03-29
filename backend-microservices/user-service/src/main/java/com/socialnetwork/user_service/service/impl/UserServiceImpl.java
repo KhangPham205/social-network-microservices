@@ -107,7 +107,8 @@ public class UserServiceImpl implements UserService {
   @Transactional(readOnly = true)
   public PageVO<UserRelationDto> searchUsers(String filter, Pageable pageable) {
     // 1. Lấy user hiện tại (thay thế bằng hàm lấy auth context của dự án mới)
-    Long viewerId = SecurityUtils.getCurrentUserId();; // getCurrentUser().getId();
+    Long viewerId = SecurityUtils.getCurrentUserId();
+    ; // getCurrentUser().getId();
 
     // TODO: Mở lại logic block khi có module Friendship
     // var blockedByMe = blockUtils.getAllBlockedIds(viewerId);
@@ -172,7 +173,7 @@ public class UserServiceImpl implements UserService {
   public FollowResponse followUser(Long targetId) {
     // TODO: Thay bằng hàm lấy user ID từ Security Context của dự án mới
     Long currentUserId = SecurityUtils.getCurrentUserId();
-    System.out.println("Current: "+currentUserId);
+    System.out.println("Current: " + currentUserId);
 
     if (currentUserId.equals(targetId)) {
       // Ném exception tuỳ chỉnh của dự án bạn (BadRequestException)
@@ -235,7 +236,8 @@ public class UserServiceImpl implements UserService {
   public PageVO<UserRelationDto> getFollowersPaged(
       Long targetId, String filter, Pageable pageable) {
     // Lấy viewerId để check quan hệ xem TÔI có follow người trong danh sách này không
-    Long viewerId = SecurityUtils.getCurrentUserId();; // TODO: getCurrentUser().getId()
+    Long viewerId = SecurityUtils.getCurrentUserId();
+    ; // TODO: getCurrentUser().getId()
 
     // Build Specification: Tìm các User có ID nằm trong tập hợp những người follow targetId
     Specification<User> spec =
@@ -257,7 +259,8 @@ public class UserServiceImpl implements UserService {
   @Transactional(readOnly = true)
   public PageVO<UserRelationDto> getFollowingPaged(
       Long targetId, String filter, Pageable pageable) {
-    Long viewerId = SecurityUtils.getCurrentUserId();; // TODO: getCurrentUser().getId()
+    Long viewerId = SecurityUtils.getCurrentUserId();
+    ; // TODO: getCurrentUser().getId()
 
     // Build Specification: Tìm các User có ID nằm trong tập hợp những người mà targetId đang follow
     Specification<User> spec =

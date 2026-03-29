@@ -20,6 +20,9 @@ public interface UserRelaRepository extends JpaRepository<UserRela, Long> {
   void deleteByFollowerAndFollowing(
       @Param("follower") User follower, @Param("following") User following);
 
+  // Lấy danh sách các quan hệ follow mà user là follower (những người user đang follow)
+  List<UserRela> findByFollower(User follower);
+
   // [MỚI THÊM] Lấy danh sách ID những người mà TÔI (viewerId) đang follow trong tập targetIds
   @Query(
       "SELECT r.following.id FROM UserRela r WHERE r.follower.id = :viewerId AND r.following.id IN :targetIds")

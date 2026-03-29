@@ -2,10 +2,10 @@ package com.socialnetwork.user_service;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.ComponentScan;
+import org.springframework.kafka.annotation.EnableKafka;
 
-@SpringBootApplication
-@ComponentScan(basePackages = {"com.socialnetwork.user_service", "security"})
+@SpringBootApplication(scanBasePackages = {"com.socialnetwork.user_service", "security"})
+@EnableKafka
 public class UserServiceApplication {
 
   public static void main(String[] args) {

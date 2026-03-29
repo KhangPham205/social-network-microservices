@@ -1,6 +1,5 @@
 package com.socialnetwork.auth_service.service.impl;
 
-import com.socialnetwork.auth_service.client.UserServiceClient;
 import com.socialnetwork.auth_service.dto.*;
 import com.socialnetwork.auth_service.enums.AccountStatus;
 import com.socialnetwork.auth_service.enums.OtpType;
@@ -16,6 +15,7 @@ import com.socialnetwork.auth_service.security.JwtProvider;
 import com.socialnetwork.auth_service.service.AuthService;
 import com.socialnetwork.auth_service.service.EmailService;
 import com.socialnetwork.auth_service.service.RefreshTokenService;
+import events.UserCreatedEvent;
 import exception.BadRequestException;
 import exception.InvalidCredentialsException;
 import exception.ResourceNotFoundException;
@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -47,7 +48,7 @@ public class AuthServiceImpl implements AuthService {
   private final RefreshTokenRepository refreshTokenRepository;
   private final EmailService emailService;
 
-  private final UserServiceClient userServiceClient;
+  private final KafkaTemplate<String, Object> kafkaTemplate;
 
   @Override
   @Transactional
@@ -59,45 +60,30 @@ public class AuthServiceImpl implements AuthService {
     Role userRole =
         roleRepository
             .findByName("USER")
-            .orElseThrow(
-                () -> new IllegalStateException("Role 'USER' not found. Please seed database."));
-
-    Set<Role> initialRoles = new HashSet<>();
-    initialRoles.add(userRole);
+            .orElseThrow(() -> new IllegalStateException("Role 'USER' not found."));
 
     UserCredential userCredential =
         UserCredential.builder()
             .username(registerRequest.getUsername())
             .password(passwordEncoder.encode(registerRequest.getPassword()))
             .email(registerRequest.getEmail())
-            .roles(initialRoles)
-            .status(AccountStatus.PENDING)
+            .roles(Set.of(userRole))
+            .status(AccountStatus.WAITING)
             .build();
 
-    // 1. Lưu vào Database của Auth-Service (Hibernate sẽ gen ID cho đối tượng này)
+    // 1. Lưu User vào DB nội bộ của Auth
     userCredentialRepository.save(userCredential);
 
-    // 2. Gọi sang User-Service để tạo Profile rỗng
-    try {
-      // Lấy ID vừa được tạo để làm accountId
-      Long accountId = userCredential.getId();
-      // Có thể lấy phần trước chữ @ của email, hoặc lấy thẳng username làm tên hiển thị tạm thời
-      String displayName = registerRequest.getUsername();
+    // 2. Bắn sự kiện (Event) ra Kafka thay vì gọi HTTP
+    UserCreatedEvent event =
+        new UserCreatedEvent(
+            userCredential.getId(), userCredential.getUsername(), userCredential.getEmail());
 
-      log.info("Calling user-service to create profile for accountId: {}", accountId);
-      userServiceClient.createEmptyProfile(accountId, displayName);
+    kafkaTemplate.send("user-created-topic", event);
+    log.info("Đã bắn event UserCreatedEvent cho accountId: {}", userCredential.getId());
 
-    } catch (Exception e) {
-      // RẤT QUAN TRỌNG: Xử lý khi gọi user-service thất bại (do mạng, sập server...)
-      log.error(
-          "Failed to create profile in user-service for username: {}",
-          registerRequest.getUsername(),
-          e);
-      // Tùy theo logic dự án, bạn có thể ném ra Exception để rollback lại việc tạo UserCredential
-      // throw new RuntimeException("Could not create user profile, registration aborted.");
-    }
-
-    return new RegisterResponse("Registered Successfully");
+    // 3. Trả về ngay lập tức cho Client (Không phải đợi User Service)
+    return new RegisterResponse("Registration initiated. Processing in background.");
   }
 
   @Override

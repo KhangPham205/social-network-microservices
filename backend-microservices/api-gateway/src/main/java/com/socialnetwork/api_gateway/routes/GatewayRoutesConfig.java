@@ -35,7 +35,7 @@ public class GatewayRoutesConfig {
   @Bean
   public RouterFunction<ServerResponse> userServiceRoute() {
     return GatewayRouterFunctions.route("user-service")
-        .route(RequestPredicates.path("/api/users/**"), HandlerFunctions.http())
+        .route(RequestPredicates.path("/api/v1/users/**"), HandlerFunctions.http())
         .filter(lb("user-service"))
         .build();
   }
@@ -46,6 +46,26 @@ public class GatewayRoutesConfig {
         .route(
             RequestPredicates.path("/aggregate/user-service/v3/api-docs"), HandlerFunctions.http())
         .filter(lb("user-service"))
+        .filter(setPath("/v3/api-docs"))
+        .build();
+  }
+
+  @Bean
+  public RouterFunction<ServerResponse> mediaServiceRoute() {
+    return GatewayRouterFunctions.route("media-service")
+        .route(
+            RequestPredicates.path("/api/v1/media/**"),
+            HandlerFunctions.http()) // Đường dẫn cho Post, Comment
+        .filter(lb("media-service"))
+        .build();
+  }
+
+  @Bean
+  public RouterFunction<ServerResponse> mediaServiceSwaggerRoute() {
+    return GatewayRouterFunctions.route("media-service-swagger")
+        .route(
+            RequestPredicates.path("/aggregate/media-service/v3/api-docs"), HandlerFunctions.http())
+        .filter(lb("media-service"))
         .filter(setPath("/v3/api-docs"))
         .build();
   }

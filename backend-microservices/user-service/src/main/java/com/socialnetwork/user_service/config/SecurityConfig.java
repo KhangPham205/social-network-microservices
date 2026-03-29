@@ -24,7 +24,7 @@ public class SecurityConfig {
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/api/users/internal/**")
+                auth.requestMatchers("/api/v1/users/internal/**")
                     .permitAll() // Mở cho Feign/HTTP Client gọi nội bộ
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**")
                     .permitAll()

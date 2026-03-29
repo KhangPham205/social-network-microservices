@@ -19,3 +19,5 @@ springdoc:
         url: /aggregate/auth-service/v3/api-docs
       - name: User Service
         url: /aggregate/user-service/v3/api-docs
+      - name: Media Service
+        url: /aggregate/media-service/v3/api-docs

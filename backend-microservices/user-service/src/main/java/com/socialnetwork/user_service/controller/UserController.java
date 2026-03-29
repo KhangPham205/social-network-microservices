@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import vo.PageVO;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class UserController {
 

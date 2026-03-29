@@ -1,16 +1,19 @@
 package com.socialnetwork.user_service.controller;
 
+import com.socialnetwork.user_service.service.FriendshipService;
 import com.socialnetwork.user_service.service.UserService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/users/internal")
+@RequestMapping("/api/v1/users/internal")
 @RequiredArgsConstructor
 public class InternalUserController {
 
   private final UserService userService;
+  private final FriendshipService friendshipService;
 
   // API này không cần token (đã được cấu hình permitAll trong SecurityConfig)
   @PostMapping("/create")
@@ -19,5 +22,20 @@ public class InternalUserController {
 
     userService.createDefaultProfile(accountId, displayName);
     return ResponseEntity.ok().build();
+  }
+
+  // Lấy danh sách ID của tất cả bạn bè + những người đang follow
+  @GetMapping("/{userId}/network-ids")
+  public ResponseEntity<List<Long>> getNetworkIds(@PathVariable Long userId) {
+    List<Long> networkIds = friendshipService.getNetworkIds(userId);
+    return ResponseEntity.ok(networkIds);
+  }
+
+  // Kiểm tra xem user1 có phải bạn của user2 không
+  @GetMapping("/check-friendship")
+  public ResponseEntity<Boolean> isFriend(
+      @RequestParam("user1") Long user1, @RequestParam("user2") Long user2) {
+    boolean isFriend = friendshipService.isFriend(user1, user2);
+    return ResponseEntity.ok(isFriend);
   }
 }

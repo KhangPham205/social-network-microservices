@@ -1,0 +1,43 @@
+server:
+  port: 8083 # Port riêng cho Media Service
+
+spring:
+  application:
+    name: media-service
+
+  # Cấu hình Database Postgres
+  datasource:
+    url: jdbc:postgresql://localhost:5434/media_db
+    username: root
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  # Cấu hình Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  # Cấu hình cho phép Upload file lớn (Video/Ảnh)
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  # Cấu hình Kafka (Producer để gửi event khi có media mới, Consumer để nhận event từ User Service nếu cần)
+  kafka:
+    bootstrap-servers: localhost:9092
+
+# Cấu hình Minio (Custom property để map vào class Config)
+minio:
+  url: http://localhost:9000
+  access-key: admin
+  secret-key: password123
+  bucket-name: social-media
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

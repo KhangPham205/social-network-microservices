@@ -15,6 +15,7 @@ import com.socialnetwork.user_service.utils.BlockUtils;
 import exception.AccessDeniedException;
 import exception.BadRequestException;
 import exception.ResourceNotFoundException;
+import jakarta.persistence.criteria.Predicate;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -369,5 +370,55 @@ public class FriendshipServiceImpl implements FriendshipService {
         .numberOfElements(0)
         .content(List.of())
         .build();
+  }
+
+  // ==========================================
+  // INTERNAL APIs (For other microservices)
+  // ==========================================
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<Long> getNetworkIds(Long userId) {
+    // Kiểm tra user tồn tại
+    User user = getUser(userId);
+
+    // Lấy danh sách bạn bè (trạng thái FRIEND)
+    Set<Long> friendIds = new HashSet<>();
+    List<Friendship> friendships =
+        friendshipRepository.findAll(
+            (root, query, cb) -> {
+              Predicate isFriend = cb.equal(root.get("status"), FriendshipStatus.FRIEND);
+              Predicate isInvolved =
+                  cb.or(cb.equal(root.get("sender"), user), cb.equal(root.get("receiver"), user));
+              return cb.and(isFriend, isInvolved);
+            });
+
+    for (Friendship f : friendships) {
+      if (f.getSender().getId().equals(userId)) {
+        friendIds.add(f.getReceiver().getId());
+      } else {
+        friendIds.add(f.getSender().getId());
+      }
+    }
+
+    // Lấy danh sách những người user đang follow (sử dụng UserRela)
+    Set<Long> followingIds =
+        userRelaRepository.findByFollower(user).stream()
+            .map(r -> r.getFollowing().getId())
+            .collect(Collectors.toSet());
+
+    // Merge cả hai set (bạn bè + những người follow)
+    Set<Long> networkIds = new HashSet<>(friendIds);
+    networkIds.addAll(followingIds);
+
+    return new ArrayList<>(networkIds);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public boolean isFriend(Long user1, Long user2) {
+    if (user1.equals(user2)) return true;
+
+    return friendshipRepository.existsActiveFriendship(user1, user2);
   }
 }
