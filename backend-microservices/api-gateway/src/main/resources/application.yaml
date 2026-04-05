@@ -21,3 +21,5 @@ springdoc:
         url: /aggregate/user-service/v3/api-docs
       - name: Media Service
         url: /aggregate/media-service/v3/api-docs
+      - name: Notification Service
+        url: /aggregate/notification-service/v3/api-docs

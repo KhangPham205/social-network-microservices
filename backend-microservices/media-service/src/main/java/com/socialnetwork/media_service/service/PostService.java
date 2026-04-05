@@ -1,7 +1,7 @@
 package com.socialnetwork.media_service.service;
 
-import com.socialnetwork.media_service.dto.PostResponse;
-import com.socialnetwork.media_service.dto.UpdatePostRequest;
+import com.socialnetwork.media_service.dto.post.PostResponse;
+import com.socialnetwork.media_service.dto.post.UpdatePostRequest;
 import com.socialnetwork.media_service.enums.AccessScope;
 import java.util.List;
 import org.springframework.data.domain.Pageable;

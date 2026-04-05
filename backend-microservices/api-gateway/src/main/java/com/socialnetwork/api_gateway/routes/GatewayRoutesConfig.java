@@ -69,4 +69,23 @@ public class GatewayRoutesConfig {
         .filter(setPath("/v3/api-docs"))
         .build();
   }
+
+  @Bean
+  public RouterFunction<ServerResponse> notificationServiceRoute() {
+    return GatewayRouterFunctions.route("notification-service")
+        .route(RequestPredicates.path("/api/v1/notifications/**"), HandlerFunctions.http())
+        .route(RequestPredicates.path("/ws/**"), HandlerFunctions.http()) // MỞ ĐƯỜNG CHO WEBSOCKET
+        .filter(lb("notification-service"))
+        .build();
+  }
+
+  @Bean
+  public RouterFunction<ServerResponse> notificationServiceSwaggerRoute() {
+    return GatewayRouterFunctions.route("notification-service-swagger")
+        .route(
+            RequestPredicates.path("/aggregate/notification-service/v3/api-docs"), HandlerFunctions.http())
+        .filter(lb("notification-service"))
+        .filter(setPath("/v3/api-docs"))
+        .build();
+  }
 }

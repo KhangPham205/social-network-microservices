@@ -1,5 +1,6 @@
-package com.socialnetwork.media_service.dto;
+package com.socialnetwork.media_service.dto.post;
 
+import com.socialnetwork.media_service.dto.react.ReactSummaryDto;
 import com.socialnetwork.media_service.enums.AccessScope;
 import java.time.Instant;
 import java.util.List;
@@ -28,7 +29,7 @@ public class PostResponse {
   private Long sharedPostId;
   private PostResponse sharedPost;
 
-  private Object reactSummary;
+  private ReactSummaryDto reactSummary;
 
   private long reportCount;
   private long complaintCount;

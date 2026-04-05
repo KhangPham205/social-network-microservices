@@ -1,16 +1,15 @@
 package com.socialnetwork.media_service.model;
 
 import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 @Entity
 @Table(name = "comments")
@@ -50,11 +49,9 @@ public class Comment {
 
   private int reactCount;
 
-  @CreationTimestamp
-  private Instant createdAt;
+  @CreationTimestamp private Instant createdAt;
 
-  @UpdateTimestamp
-  private Instant updatedAt;
+  @UpdateTimestamp private Instant updatedAt;
 
   private Instant deletedAt;
 }

@@ -1,12 +1,16 @@
 package vo;
 
 import java.util.List;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.domain.Page;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class PageVO<T> {
   Integer page;
   private Integer size;

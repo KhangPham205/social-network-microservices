@@ -1,7 +1,7 @@
 package com.socialnetwork.media_service.controller;
 
-import com.socialnetwork.media_service.dto.PostResponse;
-import com.socialnetwork.media_service.dto.UpdatePostRequest;
+import com.socialnetwork.media_service.dto.post.PostResponse;
+import com.socialnetwork.media_service.dto.post.UpdatePostRequest;
 import com.socialnetwork.media_service.enums.AccessScope;
 import com.socialnetwork.media_service.service.PostService;
 import io.swagger.v3.oas.annotations.Parameter;

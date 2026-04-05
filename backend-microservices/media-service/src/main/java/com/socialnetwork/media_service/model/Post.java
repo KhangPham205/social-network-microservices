@@ -40,6 +40,7 @@ public class Post {
   @JoinColumn(name = "shared_post_id")
   private Post sharedPost;
 
+  private int reactCount;
   private int commentCount;
   private int shareCount;
 

@@ -1,4 +1,3 @@
-
 services:
   # 1. Database ĐỘC LẬP cho Auth Service (Port 5432)
   postgres-auth:
@@ -48,7 +47,23 @@ services:
     networks:
       - social-network-net
 
-  # 4. Redis để Caching (Newsfeed, Like count)
+  # 4. Database ĐỘC LẬP cho Notification Service (Port 5435)
+  postgres-noti:
+    image: postgres:15-alpine
+    container_name: postgres_noti
+    restart: always
+    ports:
+      - "5435:5432" # Ánh xạ ra cổng 5435
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: notification_db
+    volumes:
+      - noti_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 5. Redis để Caching (Newsfeed, Like count)
   redis:
     image: redis:7.2-alpine
     container_name: social_network_redis
@@ -58,7 +73,7 @@ services:
     networks:
       - social-network-net
 
-  # 5. Minio để lưu trữ file (Ảnh/Video của Post)
+  # 6. Minio để lưu trữ file (Ảnh/Video của Post)
   minio:
     image: minio/minio:latest
     container_name: social_network_minio
@@ -75,9 +90,7 @@ services:
     networks:
       - social-network-net
 
-
-
-  # 6. pgAdmin (Quản lý chung cả 2 DB)
+  # 7. pgAdmin (Quản lý chung các DB)
   pgadmin:
     image: dpage/pgadmin4
     container_name: social_network_pgadmin
@@ -90,6 +103,8 @@ services:
     depends_on:
       - postgres-auth
       - postgres-user
+      - postgres-media
+      - postgres-noti # Thêm dòng này để pgAdmin đợi Noti DB
     networks:
       - social-network-net
 
@@ -138,11 +153,12 @@ services:
     networks:
       - social-network-net
 
-# Chia làm 2 ổ cứng ảo riêng biệt để lưu dữ liệu
+# Chia làm các ổ cứng ảo riêng biệt để lưu dữ liệu
 volumes:
   auth_db_data:
   user_db_data:
   media_db_data:
+  noti_db_data: # Bổ sung ổ cứng ảo cho Noti
   minio_data:
 
 networks:

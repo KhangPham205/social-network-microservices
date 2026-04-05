@@ -1,4 +1,4 @@
-package com.socialnetwork.media_service.dto;
+package com.socialnetwork.media_service.dto.post;
 
 import com.socialnetwork.media_service.enums.AccessScope;
 import java.util.List;

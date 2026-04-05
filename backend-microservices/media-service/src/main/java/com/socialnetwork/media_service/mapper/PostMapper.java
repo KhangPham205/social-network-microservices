@@ -1,6 +1,6 @@
 package com.socialnetwork.media_service.mapper;
 
-import com.socialnetwork.media_service.dto.PostResponse;
+import com.socialnetwork.media_service.dto.post.PostResponse;
 import com.socialnetwork.media_service.model.Post;
 import org.mapstruct.*;
 

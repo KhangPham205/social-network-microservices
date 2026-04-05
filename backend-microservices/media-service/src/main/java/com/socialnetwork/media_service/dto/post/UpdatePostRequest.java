@@ -1,4 +1,4 @@
-package com.socialnetwork.media_service.dto;
+package com.socialnetwork.media_service.dto.post;
 
 import java.util.List;
 import lombok.AllArgsConstructor;

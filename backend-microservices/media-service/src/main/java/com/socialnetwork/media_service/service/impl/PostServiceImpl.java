@@ -1,8 +1,9 @@
 package com.socialnetwork.media_service.service.impl;
 
 import com.socialnetwork.media_service.client.UserServiceClient;
-import com.socialnetwork.media_service.dto.PostResponse;
-import com.socialnetwork.media_service.dto.UpdatePostRequest;
+import com.socialnetwork.media_service.dto.post.PostResponse;
+import com.socialnetwork.media_service.dto.post.UpdatePostRequest;
+import com.socialnetwork.media_service.dto.react.ReactSummaryDto;
 import com.socialnetwork.media_service.enums.AccessScope;
 import com.socialnetwork.media_service.events.ContentCreatedEvent;
 import com.socialnetwork.media_service.mapper.PostMapper;
@@ -11,6 +12,7 @@ import com.socialnetwork.media_service.model.UserCache;
 import com.socialnetwork.media_service.repository.PostRepository;
 import com.socialnetwork.media_service.repository.UserCacheRepository;
 import com.socialnetwork.media_service.service.PostService;
+import com.socialnetwork.media_service.service.ReactService;
 import com.socialnetwork.media_service.service.StorageService;
 import exception.AccessDeniedException;
 import exception.ResourceNotFoundException;
@@ -20,6 +22,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -29,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import vo.PageVO;
+import vo.TargetType;
 
 @Service
 @RequiredArgsConstructor
@@ -39,11 +44,13 @@ public class PostServiceImpl implements PostService {
   private final UserCacheRepository userCacheRepository;
   private final UserServiceClient userServiceClient; // Gọi sang user-service
   private final StorageService storageService; // Xử lý upload Minio
+  private final ReactService reactService;
   private final PostMapper postMapper;
   private final KafkaTemplate<String, Object> kafkaTemplate;
 
   @Override
   @Transactional
+  @CacheEvict(value = "newsfeed", allEntries = true)
   public PostResponse create(
       String content, String accessModifier, List<MultipartFile> mediaFiles) {
     Long currentUserId = getCurrentUserId();
@@ -90,6 +97,9 @@ public class PostServiceImpl implements PostService {
 
   @Override
   @Transactional
+  @CacheEvict(
+      value = {"newsfeed", "post_details"},
+      allEntries = true)
   public PostResponse update(UpdatePostRequest request) {
     Long currentUserId = getCurrentUserId();
     Post post =
@@ -136,6 +146,7 @@ public class PostServiceImpl implements PostService {
 
   @Override
   @Transactional(readOnly = true)
+  @Cacheable(value = "post_details", key = "#postId")
   public PostResponse getPostById(Long postId) {
     Long currentUserId = getCurrentUserId();
     Post post =
@@ -149,6 +160,7 @@ public class PostServiceImpl implements PostService {
 
   @Override
   @Transactional(readOnly = true)
+  @Cacheable(value = "newsfeed", key = "#currentUserId + '_' + #pageable.pageNumber")
   public PageVO<PostResponse> getFeed(Pageable pageable, String filter) {
     Long currentUserId = getCurrentUserId();
 
@@ -271,6 +283,9 @@ public class PostServiceImpl implements PostService {
 
   @Override
   @Transactional
+  @CacheEvict(
+      value = {"newsfeed", "post_details"},
+      allEntries = true)
   public void deletePost(Long postId) {
     Long currentUserId = getCurrentUserId();
     Post post =
@@ -342,8 +357,62 @@ public class PostServiceImpl implements PostService {
   }
 
   private PageVO<PostResponse> buildPageVO(Page<Post> postPage, Long currentUserId) {
+    List<Post> posts = postPage.getContent();
+    if (posts.isEmpty()) {
+      return PageVO.<PostResponse>builder()
+          .page(postPage.getNumber())
+          .size(postPage.getSize())
+          .totalElements(postPage.getTotalElements())
+          .totalPages(postPage.getTotalPages())
+          .numberOfElements(0)
+          .content(List.of())
+          .build();
+    }
+
+    // 1. Lấy ID của tất cả bài viết trong trang hiện tại
+    List<Long> postIds = posts.stream().map(Post::getId).toList();
+
+    // 2. Lấy luôn ID của các bài được share (nếu có) để query React 1 thể
+    List<Long> sharedPostIds =
+        posts.stream().map(Post::getSharedPost).filter(Objects::nonNull).map(Post::getId).toList();
+
+    // 3. Gọi ReactService ĐÚNG 1 LẦN để lấy toàn bộ Summary (cực nhanh)
+    Map<Long, ReactSummaryDto> reactMap =
+        reactService.getReactSummaries(postIds, currentUserId, TargetType.POST);
+
+    Map<Long, ReactSummaryDto> sharedReactMap =
+        sharedPostIds.isEmpty()
+            ? Map.of()
+            : reactService.getReactSummaries(sharedPostIds, currentUserId, TargetType.POST);
+
+    // 4. Map vào DTO
     List<PostResponse> content =
-        postPage.getContent().stream().map(post -> toDtoWithDetails(post, currentUserId)).toList();
+        posts.stream()
+            .map(
+                post -> {
+                  PostResponse dto = postMapper.toDto(post);
+
+                  // Gắn React cho bài gốc
+                  dto.setReactSummary(
+                      reactMap.getOrDefault(post.getId(), new ReactSummaryDto(Map.of(), 0L, null)));
+
+                  // Gắn React cho bài Share
+                  if (post.getSharedPost() != null) {
+                    try {
+                      checkViewPermission(post.getSharedPost(), currentUserId);
+                      PostResponse sharedDto = postMapper.toDto(post.getSharedPost());
+                      sharedDto.setReactSummary(
+                          sharedReactMap.getOrDefault(
+                              post.getSharedPost().getId(),
+                              new ReactSummaryDto(Map.of(), 0L, null)));
+                      dto.setSharedPost(sharedDto);
+                    } catch (AccessDeniedException e) {
+                      dto.setSharedPost(null); // Không có quyền xem bài gốc
+                    }
+                  }
+                  return dto;
+                })
+            .toList();
 
     return PageVO.<PostResponse>builder()
         .page(postPage.getNumber())
@@ -358,18 +427,19 @@ public class PostServiceImpl implements PostService {
   private PostResponse toDtoWithDetails(Post post, Long currentUserId) {
     PostResponse dto = postMapper.toDto(post);
 
-    // TODO: Chỗ này sau này bạn tích hợp Redis (ReactService) để lấy tổng Like
-    // dto.setReactSummary(reactService.getReactSummaryFromRedis(post.getId(), currentUserId));
+    // Lấy React cho 1 bài duy nhất
+    dto.setReactSummary(reactService.getReactSummary(post.getId(), TargetType.POST, currentUserId));
 
     if (post.getSharedPost() != null) {
       try {
-        // Kiểm tra xem viewer có quyền xem bài gốc không
         checkViewPermission(post.getSharedPost(), currentUserId);
-        // Đệ quy ánh xạ bài share
-        dto.setSharedPost(postMapper.toDto(post.getSharedPost()));
+        PostResponse sharedDto = postMapper.toDto(post.getSharedPost());
+        sharedDto.setReactSummary(
+            reactService.getReactSummary(
+                post.getSharedPost().getId(), TargetType.POST, currentUserId));
+        dto.setSharedPost(sharedDto);
       } catch (AccessDeniedException e) {
-        dto.setSharedPost(null); // Không có quyền xem bài gốc
-        // dto.setSharedPostVisible(false); // (Tuỳ logic FE của bạn)
+        dto.setSharedPost(null);
       }
     }
     return dto;
