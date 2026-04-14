@@ -71,4 +71,9 @@ public class UserController {
       @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(userService.getFollowingPaged(id, filter, pageable));
   }
+
+  @GetMapping("/{id}/relation-status")
+  public ResponseEntity<UserRelationDto> getRelationStatus(@PathVariable Long id) {
+    return ResponseEntity.ok(userService.getRelationWithUser(id));
+  }
 }

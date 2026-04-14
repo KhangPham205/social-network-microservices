@@ -12,16 +12,23 @@ public class SecurityUtils {
   public static Long getCurrentUserId() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || "anonymousUser".equals(authentication.getPrincipal())) {
+    if (authentication == null || !authentication.isAuthenticated()) {
       throw new AccessDeniedException("User is not authenticated");
     }
 
+    String name = authentication.getName();
+
+    // Kiểm tra nếu là anonymous user (do AnonymousAuthenticationFilter set)
+    if (name == null || name.equals("anonymousUser")) {
+      throw new AccessDeniedException(
+          "User is not authenticated. Please provide a valid JWT token.");
+    }
+
     try {
-      return Long.parseLong(authentication.getName());
+      return Long.parseLong(name);
     } catch (NumberFormatException e) {
-      throw new AccessDeniedException("Invalid user ID format in token");
+      throw new AccessDeniedException(
+          "Invalid user ID format in token. Expected numeric ID but got: " + name);
     }
   }
 }

@@ -6,6 +6,7 @@ import com.socialnetwork.media_service.repository.UserCacheRepository;
 import events.UserCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,21 +19,19 @@ public class UserCacheSyncHandler {
   private final UserCacheRepository userCacheRepository;
   private final ObjectMapper objectMapper;
 
-  // 1. Lắng nghe sự kiện TẠO MỚI user từ auth-service
   @KafkaListener(topics = "user-created-topic", groupId = "media-service-group-v1")
   @Transactional
-  public void handleUserCreatedEvent(Object messagePayload) {
+  public void handleUserCreatedEvent(ConsumerRecord<String, Object> record) {
     try {
-      // Ép kiểu từ LinkedHashMap sang UserCreatedEvent
-      UserCreatedEvent event = objectMapper.convertValue(messagePayload, UserCreatedEvent.class);
+      Object payload = record.value();
+      UserCreatedEvent event = objectMapper.convertValue(payload, UserCreatedEvent.class);
       log.info("Received UserCreatedEvent to sync UserCache for accountId: {}", event.accountId());
 
-      // Lưu vào DB nội bộ của Media Service
       UserCache userCache =
           UserCache.builder()
               .id(event.accountId())
-              .displayName(event.username()) // Lấy username làm tên hiển thị tạm thời
-              .avatarUrl(null) // Mới tạo chưa có avatar
+              .displayName(event.username())
+              .avatarUrl(null)
               .build();
 
       userCacheRepository.save(userCache);
@@ -43,7 +42,7 @@ public class UserCacheSyncHandler {
     }
   }
 
-  // 2. (Mở rộng sau này) Lắng nghe sự kiện CẬP NHẬT profile từ user-service
+  // (Mở rộng sau này) Lắng nghe sự kiện CẬP NHẬT profile từ user-service
   /*
   @KafkaListener(topics = "profile-updated-topic", groupId = "media-service-group-v1")
   @Transactional

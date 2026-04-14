@@ -31,7 +31,7 @@
 	<dependencies>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-gateway-server-webmvc</artifactId>
+            <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
         </dependency>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
@@ -50,13 +50,13 @@
 
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>3.0.1</version>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+            <version>3.0.3</version>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
-            <version>3.0.1</version>
+            <artifactId>springdoc-openapi-starter-webflux-api</artifactId>
+            <version>3.0.3</version>
         </dependency>
 	</dependencies>
 

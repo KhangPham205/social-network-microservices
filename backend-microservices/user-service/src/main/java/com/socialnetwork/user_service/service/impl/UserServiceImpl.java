@@ -1,12 +1,10 @@
 package com.socialnetwork.user_service.service.impl;
 
-import com.socialnetwork.user_service.dto.FollowResponse;
-import com.socialnetwork.user_service.dto.UpdateProfileRequest;
-import com.socialnetwork.user_service.dto.UserProfileDto;
-import com.socialnetwork.user_service.dto.UserRelationDto;
+import com.socialnetwork.user_service.dto.*;
 import com.socialnetwork.user_service.model.User;
 import com.socialnetwork.user_service.model.UserInfo;
 import com.socialnetwork.user_service.model.UserRela;
+import com.socialnetwork.user_service.repository.FriendshipRepository;
 import com.socialnetwork.user_service.repository.UserRelaRepository;
 import com.socialnetwork.user_service.repository.UserRepository;
 import com.socialnetwork.user_service.service.UserService;
@@ -34,6 +32,7 @@ public class UserServiceImpl implements UserService {
 
   private final UserRepository userRepository;
   private final UserRelaRepository userRelaRepository;
+  private final FriendshipRepository friendshipRepository;
 
   // --- HÀM LẤY ID TỪ TOKEN ---
   private Long getCurrentUserId() {
@@ -289,6 +288,15 @@ public class UserServiceImpl implements UserService {
         .orElseThrow(() -> new ResourceNotFoundException("User not found"));
   }
 
+  @Override
+  public UserRelationDto getRelationWithUser(Long targetId) {
+    User current = getCurrentUser();
+    User target = userRepository.findById(targetId)
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+    return mapToRelationDto(current, target);
+  }
+
   /** Hàm map tạm thời khi chưa có module Friendship/Follow */
   private Map<Long, UserRelationDto> mapPageToRelationDtos(Long viewerId, List<User> targets) {
     if (targets.isEmpty()) {
@@ -372,5 +380,40 @@ public class UserServiceImpl implements UserService {
               cb.like(cb.lower(root.join("userInfo", JoinType.LEFT).get("bio")), likeFilter),
               cb.like(cb.lower(root.join("userInfo", JoinType.LEFT).get("favorites")), likeFilter));
     }
+  }
+
+  private UserRelationDto mapToRelationDto(User viewer, User target) {
+    boolean isFollowing = userRelaRepository.existsByFollowerAndFollowing(viewer, target);
+    boolean isFollowedBy = userRelaRepository.existsByFollowerAndFollowing(target, viewer);
+
+    var friendship = friendshipRepository.findBySenderAndReceiver(viewer, target)
+        .or(() -> friendshipRepository.findBySenderAndReceiver(target, viewer))
+        .map(f -> FriendshipResponse.builder()
+            .status(f.getStatus())
+            .senderId(f.getSender().getId())
+            .receiverId(f.getReceiver().getId())
+            .build())
+        .orElse(FriendshipResponse.builder().build()); // Empty response if no friendship exists
+
+    UserProfileDto base = UserRelationDto.builder()
+        .id(target.getId())
+        .displayName(target.getDisplayName())
+        .avatarUrl(target.getAvatarUrl())
+        .bio(target.getUserInfo() != null ? target.getUserInfo().getBio() : null)
+        .favorites(target.getUserInfo() != null ? target.getUserInfo().getFavorites() : null)
+        .dateOfBirth(target.getUserInfo() != null ? target.getUserInfo().getDateOfBirth() : null)
+        .build();
+
+    return UserRelationDto.builder()
+        .id(base.getId())
+        .displayName(base.getDisplayName())
+        .avatarUrl(base.getAvatarUrl())
+        .bio(base.getBio())
+        .favorites(base.getFavorites())
+        .dateOfBirth(base.getDateOfBirth())
+        .isFollowing(isFollowing)
+        .isFollowedBy(isFollowedBy)
+        .friendship(friendship) // Use the properly built friendship response
+        .build();
   }
 }

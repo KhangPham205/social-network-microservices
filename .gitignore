@@ -19,3 +19,4 @@ backend-microservices/user-service/src/main/resources/application-dev.yaml
 backend-microservices/auth-service/src/main/resources/application-dev.yaml
 backend-microservices/auth-service/src/main/resources/application-dev.yaml
 backend-microservices/notification-service/src/main/resources/application-dev.yaml
+backend-microservices/media-service/src/main/resources/application-dev.yaml

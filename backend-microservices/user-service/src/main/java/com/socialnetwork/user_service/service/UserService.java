@@ -5,6 +5,7 @@ import com.socialnetwork.user_service.dto.UpdateProfileRequest;
 import com.socialnetwork.user_service.dto.UserProfileDto;
 import com.socialnetwork.user_service.dto.UserRelationDto;
 import com.socialnetwork.user_service.model.User;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import vo.PageVO;
 
@@ -29,4 +30,6 @@ public interface UserService {
   PageVO<UserRelationDto> getFollowingPaged(Long id, String filter, Pageable pageable);
 
   User getCurrentUser();
+
+  UserRelationDto getRelationWithUser(Long id);
 }

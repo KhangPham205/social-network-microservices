@@ -35,7 +35,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
   @Override
   public void configureClientInboundChannel(ChannelRegistration registration) {
-    // Đăng ký Interceptor của bạn để nó gán Principal (user) cho MỌI tin nhắn STOMP
     registration.interceptors(stompPrincipalInterceptor);
   }
 }

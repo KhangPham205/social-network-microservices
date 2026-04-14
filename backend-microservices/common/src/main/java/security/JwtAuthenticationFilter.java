@@ -27,23 +27,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
-    final String authHeader = request.getHeader("Authorization");
+    String path = request.getRequestURI();
 
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+    if (path.startsWith("/ws")) {
       filterChain.doFilter(request, response);
       return;
     }
 
-    final String token = authHeader.substring(7);
+    String token = null;
+    final String authHeader = request.getHeader("Authorization");
 
-    if (jwtValidator.validateToken(token)
+    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
+    }
+
+    if (token != null
+        && jwtValidator.validateToken(token)
         && SecurityContextHolder.getContext().getAuthentication() == null) {
+
       Long userId = jwtValidator.extractUserId(token);
 
-      // Gắn UserId làm Principal. Tạm thời để roles là ArrayList rỗng (có thể parse roles từ token
-      // sau nếu cần check quyền Admin)
       UsernamePasswordAuthenticationToken authToken =
           new UsernamePasswordAuthenticationToken(userId.toString(), null, new ArrayList<>());
+
       authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
       SecurityContextHolder.getContext().setAuthentication(authToken);
     }
