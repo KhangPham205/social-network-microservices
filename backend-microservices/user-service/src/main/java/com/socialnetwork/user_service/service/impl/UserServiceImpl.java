@@ -291,8 +291,10 @@ public class UserServiceImpl implements UserService {
   @Override
   public UserRelationDto getRelationWithUser(Long targetId) {
     User current = getCurrentUser();
-    User target = userRepository.findById(targetId)
-        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    User target =
+        userRepository
+            .findById(targetId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
     return mapToRelationDto(current, target);
   }
@@ -386,23 +388,29 @@ public class UserServiceImpl implements UserService {
     boolean isFollowing = userRelaRepository.existsByFollowerAndFollowing(viewer, target);
     boolean isFollowedBy = userRelaRepository.existsByFollowerAndFollowing(target, viewer);
 
-    var friendship = friendshipRepository.findBySenderAndReceiver(viewer, target)
-        .or(() -> friendshipRepository.findBySenderAndReceiver(target, viewer))
-        .map(f -> FriendshipResponse.builder()
-            .status(f.getStatus())
-            .senderId(f.getSender().getId())
-            .receiverId(f.getReceiver().getId())
-            .build())
-        .orElse(FriendshipResponse.builder().build()); // Empty response if no friendship exists
+    var friendship =
+        friendshipRepository
+            .findBySenderAndReceiver(viewer, target)
+            .or(() -> friendshipRepository.findBySenderAndReceiver(target, viewer))
+            .map(
+                f ->
+                    FriendshipResponse.builder()
+                        .status(f.getStatus())
+                        .senderId(f.getSender().getId())
+                        .receiverId(f.getReceiver().getId())
+                        .build())
+            .orElse(FriendshipResponse.builder().build()); // Empty response if no friendship exists
 
-    UserProfileDto base = UserRelationDto.builder()
-        .id(target.getId())
-        .displayName(target.getDisplayName())
-        .avatarUrl(target.getAvatarUrl())
-        .bio(target.getUserInfo() != null ? target.getUserInfo().getBio() : null)
-        .favorites(target.getUserInfo() != null ? target.getUserInfo().getFavorites() : null)
-        .dateOfBirth(target.getUserInfo() != null ? target.getUserInfo().getDateOfBirth() : null)
-        .build();
+    UserProfileDto base =
+        UserRelationDto.builder()
+            .id(target.getId())
+            .displayName(target.getDisplayName())
+            .avatarUrl(target.getAvatarUrl())
+            .bio(target.getUserInfo() != null ? target.getUserInfo().getBio() : null)
+            .favorites(target.getUserInfo() != null ? target.getUserInfo().getFavorites() : null)
+            .dateOfBirth(
+                target.getUserInfo() != null ? target.getUserInfo().getDateOfBirth() : null)
+            .build();
 
     return UserRelationDto.builder()
         .id(base.getId())

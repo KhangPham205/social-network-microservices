@@ -21,13 +21,13 @@ public class CommentController {
 
   @GetMapping("/post/{postId}")
   public ResponseEntity<PageVO<CommentResponse>> getCommentsByPost(
-      @PathVariable Long postId, @ParameterObject Pageable pageable) {
+      @PathVariable("postId") Long postId, @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(commentService.getCommentsByPost(postId, pageable));
   }
 
   @GetMapping("/{commentId}/replies")
   public ResponseEntity<PageVO<CommentResponse>> getReplies(
-      @PathVariable Long commentId, @ParameterObject Pageable pageable) {
+      @PathVariable("commentId") Long commentId, @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(commentService.getReplies(commentId, pageable));
   }
 
@@ -42,9 +42,9 @@ public class CommentController {
     return ResponseEntity.ok(commentService.updateComment(request));
   }
 
-  @DeleteMapping("/{id}")
-  public ResponseEntity<Void> deleteComment(@PathVariable Long id) {
-    commentService.deleteComment(id);
+  @DeleteMapping("/{commentId}")
+  public ResponseEntity<Void> deleteComment(@PathVariable("commentId") Long commentId) {
+    commentService.deleteComment(commentId);
     return ResponseEntity.noContent().build();
   }
 }

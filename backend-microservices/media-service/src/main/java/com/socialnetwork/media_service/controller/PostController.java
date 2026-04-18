@@ -39,7 +39,7 @@ public class PostController {
   //    }
 
   @GetMapping("/{postId}")
-  public ResponseEntity<PostResponse> getPostById(@PathVariable Long postId) {
+  public ResponseEntity<PostResponse> getPostById(@PathVariable("postId") Long postId) {
     return ResponseEntity.ok(postService.getPostById(postId));
   }
 
@@ -73,12 +73,12 @@ public class PostController {
 
   @GetMapping("/user/{userId}")
   public ResponseEntity<PageVO<PostResponse>> getUserPosts(
-      @PathVariable Long userId, @ParameterObject Pageable pageable) {
+      @PathVariable("userId") Long userId, @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(postService.getUserPosts(userId, pageable));
   }
 
   @DeleteMapping("/{postId}")
-  public ResponseEntity<Void> delete(@PathVariable Long postId) {
+  public ResponseEntity<Void> delete(@PathVariable("postId") Long postId) {
     postService.deletePost(postId);
     return ResponseEntity.noContent().build();
   }

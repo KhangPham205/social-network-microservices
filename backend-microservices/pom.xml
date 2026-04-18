@@ -17,6 +17,7 @@
         <module>user-service</module>
         <module>media-service</module>
         <module>notification-service</module>
+        <module>chat-service</module>
         <module>common</module>
     </modules>
 

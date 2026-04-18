@@ -28,15 +28,15 @@ public class ReactController {
 
   @GetMapping("/{targetType}/{targetId}/users")
   public ResponseEntity<PageVO<ReactUserDto>> getReactUsers(
-      @PathVariable TargetType targetType,
-      @PathVariable Long targetId,
+      @PathVariable("targetType") TargetType targetType,
+      @PathVariable("targetId") Long targetId,
       @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(reactService.getReactUsers(targetId, targetType, pageable));
   }
 
   @GetMapping("/{targetType}/{targetId}/summary")
   public ResponseEntity<ReactSummaryDto> getReactSummary(
-      @PathVariable TargetType targetType, @PathVariable Long targetId) {
+      @PathVariable("targetType") TargetType targetType, @PathVariable("targetId") Long targetId) {
     Long currentUserId =
         Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
     return ResponseEntity.ok(reactService.getReactSummary(targetId, targetType, currentUserId));

@@ -5,11 +5,11 @@ services:
     container_name: postgres_auth
     restart: always
     ports:
-      - "5432:5432" # Chạy ở cổng 5432
+      - "5432:5432"
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: auth_db # Tự động tạo DB tên là auth_db
+      POSTGRES_DB: auth_db
     volumes:
       - auth_db_data:/var/lib/postgresql/data
     networks:
@@ -21,11 +21,11 @@ services:
     container_name: postgres_user
     restart: always
     ports:
-      - "5433:5432" # Ánh xạ ra ngoài máy bạn là cổng 5433
+      - "5433:5432"
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: user_db # Tự động tạo DB tên là user_db
+      POSTGRES_DB: user_db
     volumes:
       - user_db_data:/var/lib/postgresql/data
     networks:
@@ -37,7 +37,7 @@ services:
     container_name: postgres_media
     restart: always
     ports:
-      - "5434:5432" # Ánh xạ ra cổng 5434 để không đụng Auth và User
+      - "5434:5432"
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: password
@@ -53,7 +53,7 @@ services:
     container_name: postgres_noti
     restart: always
     ports:
-      - "5435:5432" # Ánh xạ ra cổng 5435
+      - "5435:5432"
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: password
@@ -63,7 +63,54 @@ services:
     networks:
       - social-network-net
 
-  # 5. Redis để Caching (Newsfeed, Like count)
+  # 🔥 5. Database ĐỘC LẬP cho Chat Service (Port 5436) - QUẢN LÝ PHÒNG CHAT
+  postgres-chat:
+    image: postgres:15-alpine
+    container_name: postgres_chat
+    restart: always
+    ports:
+      - "5436:5432" # Ánh xạ ra cổng 5436
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: chat_db
+    volumes:
+      - chat_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 6. MongoDB cho Chat Service - LƯU TRỮ TIN NHẮN
+  mongodb:
+    image: mongo:latest
+    container_name: social_network_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - social-network-net
+
+  # 7. Mongo Express - GIAO DIỆN QUẢN LÝ MONGODB (Port 8081)
+  mongo-express:
+    image: mongo-express
+    container_name: social_network_mongo_express
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password@mongodb:27017/
+    depends_on:
+      - mongodb
+    networks:
+      - social-network-net
+
+  # 8. Redis để Caching (Newsfeed, Like count)
   redis:
     image: redis:7.2-alpine
     container_name: social_network_redis
@@ -73,14 +120,14 @@ services:
     networks:
       - social-network-net
 
-  # 6. Minio để lưu trữ file (Ảnh/Video của Post)
+  # 9. Minio để lưu trữ file (Ảnh/Video của Post)
   minio:
     image: minio/minio:latest
     container_name: social_network_minio
     restart: always
     ports:
-      - "9000:9000" # Port API cho Spring Boot gọi vào
-      - "9001:9001" # Port giao diện Web Console (để bạn quản lý file)
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: password123
@@ -90,7 +137,7 @@ services:
     networks:
       - social-network-net
 
-  # 7. pgAdmin (Quản lý chung các DB)
+  # 10. pgAdmin (Quản lý chung các DB Postgres)
   pgadmin:
     image: dpage/pgadmin4
     container_name: social_network_pgadmin
@@ -104,10 +151,12 @@ services:
       - postgres-auth
       - postgres-user
       - postgres-media
-      - postgres-noti # Thêm dòng này để pgAdmin đợi Noti DB
+      - postgres-noti
+      - postgres-chat # Đã cập nhật để đợi Chat DB
     networks:
       - social-network-net
 
+  # 11. Kafka
   kafka:
     image: apache/kafka:3.7.0
     container_name: social_network_kafka
@@ -115,29 +164,22 @@ services:
     ports:
       - "9092:9092"
     environment:
-      # KRaft mode
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      # Sửa thành localhost để tránh lỗi phân giải DNS lúc container mới nhú lên
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-
-      # --- CẤU HÌNH LẠI LISTENERS ---
       KAFKA_LISTENERS: EXTERNAL://0.0.0.0:9092,INTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093
       KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9092,INTERNAL://kafka:9094
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-
       KAFKA_CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
-
-      # (Quan trọng) Bổ sung 3 cờ này cho môi trường dev 1 broker,
-      # nếu không Kafka sẽ báo lỗi thiếu replication khi tạo các topic nội bộ
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     networks:
       - social-network-net
 
+  # 12. Kafka UI
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: social_network_kafka_ui
@@ -146,19 +188,20 @@ services:
       - "8888:8080"
     environment:
       - KAFKA_CLUSTERS_0_NAME=local-kraft
-      # SỬA LẠI: Kafka UI sẽ gọi qua cổng INTERNAL là 9094
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9094
     depends_on:
       - kafka
     networks:
       - social-network-net
 
-# Chia làm các ổ cứng ảo riêng biệt để lưu dữ liệu
+# Đã bổ sung đầy đủ ổ cứng ảo
 volumes:
   auth_db_data:
   user_db_data:
   media_db_data:
-  noti_db_data: # Bổ sung ổ cứng ảo cho Noti
+  noti_db_data:
+  chat_db_data: # Ổ cứng cho Postgres Chat
+  mongo_data:   # Ổ cứng cho MongoDB
   minio_data:
 
 networks:
