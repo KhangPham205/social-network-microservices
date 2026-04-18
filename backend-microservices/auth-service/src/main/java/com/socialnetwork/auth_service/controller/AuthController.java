@@ -5,8 +5,10 @@ import com.socialnetwork.auth_service.service.AuthService;
 import com.socialnetwork.auth_service.service.PasswordResetService;
 import com.socialnetwork.auth_service.service.RefreshTokenService;
 import constants.ApiConstants;
+import jakarta.ws.rs.core.HttpHeaders;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,23 +28,81 @@ public class AuthController {
 
   @PostMapping("/login")
   public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
-    return ResponseEntity.ok(authService.login(request));
+    LoginResponse response = authService.login(request);
+
+    ResponseCookie jwtCookie =
+        ResponseCookie.from("jwt", response.getToken().getAccessToken())
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(7 * 24 * 60 * 60) // 7 days
+            .sameSite("None")
+            .build();
+
+    ResponseCookie refreshCookie =
+        ResponseCookie.from("refreshToken", response.getToken().getRefreshToken())
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(30 * 24 * 60 * 60) // 30 days
+            .sameSite("None")
+            .build();
+
+    //    response.setToken(null);
+
+    return ResponseEntity.ok()
+        .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+        .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+        .body(response);
   }
 
   @PostMapping("/logout")
-  public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      return ResponseEntity.badRequest().body("Invalid token header");
+  public ResponseEntity<?> logout(@CookieValue(name = "jwt", required = false) String jwt) {
+    if (jwt == null || !jwt.isEmpty()) {
+      authService.logout(jwt);
     }
 
-    String token = authHeader.substring(7);
-    authService.logout(token);
-    return ResponseEntity.ok("Logged out successfully");
+    ResponseCookie cleanJwtCookie =
+        ResponseCookie.from("jwt", "").httpOnly(true).path("/").maxAge(0).build();
+    ResponseCookie cleanRefreshCookie =
+        ResponseCookie.from("refreshToken", "").httpOnly(true).path("/").maxAge(0).build();
+
+    return ResponseEntity.ok()
+        .header(HttpHeaders.SET_COOKIE, cleanJwtCookie.toString())
+        .header(HttpHeaders.SET_COOKIE, cleanRefreshCookie.toString())
+        .body("Logged out successfully");
   }
 
   @PostMapping("/refresh")
-  public ResponseEntity<TokenResponse> refresh(@RequestBody RefreshTokenRequest request) {
-    return ResponseEntity.ok(refreshTokenService.refresh(request));
+  public ResponseEntity<?> refresh(
+      @CookieValue(name = "refreshToken", required = false) String refreshToken) {
+    if (refreshToken == null || refreshToken.isEmpty()) {
+      return ResponseEntity.status(401).body("Missing refresh token cookie");
+    }
+
+    TokenResponse newTokens = refreshTokenService.refresh(new RefreshTokenRequest(refreshToken));
+
+    ResponseCookie newJwtCookie =
+        ResponseCookie.from("jwt", newTokens.getAccessToken())
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(24 * 60 * 60)
+            .sameSite("None")
+            .build();
+    ResponseCookie newRefreshCookie =
+        ResponseCookie.from("refreshToken", newTokens.getRefreshToken())
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(7 * 24 * 60 * 60)
+            .sameSite("None")
+            .build();
+
+    return ResponseEntity.ok()
+        .header(HttpHeaders.SET_COOKIE, newJwtCookie.toString())
+        .header(HttpHeaders.SET_COOKIE, newRefreshCookie.toString())
+        .body(Map.of("message", "Token refreshed successfully"));
   }
 
   @PostMapping("/sendVerifyEmail")

@@ -1,12 +1,12 @@
 package com.socialnetwork.notification_service.infra.websocket;
 
-import java.net.URI;
+import jakarta.servlet.http.Cookie;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
@@ -24,54 +24,32 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
       ServerHttpRequest request,
       ServerHttpResponse response,
       WebSocketHandler wsHandler,
-      Map<String, Object> attributes) {
-    try {
+      Map<String, Object> attributes)
+      throws Exception {
+
+    if (request instanceof ServletServerHttpRequest) {
+      ServletServerHttpRequest servletRequest = (ServletServerHttpRequest) request;
+      Cookie[] cookies = servletRequest.getServletRequest().getCookies();
+
       String token = null;
-
-      // 1. Thử lấy token từ query string (phương thức cũ)
-      URI uri = request.getURI();
-      String query = uri.getQuery();
-      if (query != null && query.startsWith("token=")) {
-        token = query.substring("token=".length());
-        log.info("📌 Token từ Query String");
-      }
-
-      // 2. Nếu không có, thử lấy từ Authorization header (từ Gateway)
-      if (token == null) {
-        String authHeader = request.getHeaders().getFirst("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-          token = authHeader.substring(7);
-          log.info("📌 Token từ Authorization Header");
+      if (cookies != null) {
+        for (Cookie cookie : cookies) {
+          if ("jwt".equals(cookie.getName())) {
+            token = cookie.getValue();
+            break;
+          }
         }
       }
 
-      // 3. Nếu vẫn không có token
-      if (token == null) {
-        log.warn("⚠️ WebSocket Handshake: No token provided");
-        response.setStatusCode(HttpStatus.UNAUTHORIZED);
-        return false;
+      if (token != null && jwtValidator.validateToken(token)) {
+        // Lấy userId ra và lưu vào attributes để WebSocket xài
+        Long userId = jwtValidator.extractUserId(token);
+        attributes.put("userId", userId);
+        return true;
       }
-
-      // 4. Validate token
-      if (!jwtValidator.validateToken(token)) {
-        log.warn("⚠️ WebSocket Handshake: Invalid token");
-        response.setStatusCode(HttpStatus.UNAUTHORIZED);
-        return false;
-      }
-
-      // 5. Lấy userId từ token
-      Long userId = jwtValidator.extractUserId(token);
-      attributes.put("userId", userId);
-      attributes.put("token", token);
-      log.info("✅ WebSocket Handshake Success for user: {}", userId);
-
-      return true;
-
-    } catch (Exception e) {
-      log.error("❌ WebSocket Handshake Failed: {}", e.getMessage(), e);
-      response.setStatusCode(HttpStatus.FORBIDDEN);
-      return false;
     }
+
+    return false;
   }
 
   @Override

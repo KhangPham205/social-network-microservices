@@ -2,6 +2,7 @@ package com.socialnetwork.auth_service.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -29,14 +30,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
-    final String authHeader = request.getHeader("Authorization");
+    String token = getJwtFromCookies(request);
 
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+    // Nếu không có token, cho đi tiếp (sẽ bị Spring Security chặn lại sau nếu API đó yêu cầu auth)
+    if (token == null) {
       filterChain.doFilter(request, response);
       return;
     }
 
-    final String token = authHeader.substring(7);
     final String username = jwtProvider.extractUsername(token);
 
     if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -53,5 +54,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       }
     }
     filterChain.doFilter(request, response);
+  }
+
+  private String getJwtFromCookies(HttpServletRequest request) {
+    if (request.getCookies() != null) {
+      for (Cookie cookie : request.getCookies()) {
+        if ("jwt".equals(cookie.getName())) {
+          return cookie.getValue();
+        }
+      }
+    }
+    return null;
   }
 }
