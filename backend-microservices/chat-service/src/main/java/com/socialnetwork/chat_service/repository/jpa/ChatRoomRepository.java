@@ -1,4 +1,4 @@
-package com.socialnetwork.chat_service.repository;
+package com.socialnetwork.chat_service.repository.jpa;
 
 import com.socialnetwork.chat_service.model.ChatRoom;
 import java.util.Optional;

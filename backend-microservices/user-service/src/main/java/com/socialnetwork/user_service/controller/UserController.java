@@ -20,20 +20,17 @@ public class UserController {
 
   private final UserService userService;
 
-  // Xem profile của chính mình
   @GetMapping("/me")
   public ResponseEntity<UserProfileDto> getMyProfile() {
     Long myId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
     return ResponseEntity.ok(userService.getProfile(myId));
   }
 
-  // Xem profile của người khác
   @GetMapping("/{userId}")
   public ResponseEntity<UserProfileDto> getUserProfile(@PathVariable("userId") Long userId) {
     return ResponseEntity.ok(userService.getProfile(userId));
   }
 
-  // Cập nhật profile
   @PutMapping("/me")
   public ResponseEntity<UserProfileDto> updateProfile(@RequestBody UpdateProfileRequest request) {
     return ResponseEntity.ok(userService.updateMyProfile(request));

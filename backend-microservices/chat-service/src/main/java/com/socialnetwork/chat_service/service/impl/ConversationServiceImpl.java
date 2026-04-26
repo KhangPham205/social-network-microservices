@@ -8,9 +8,9 @@ import com.socialnetwork.chat_service.model.ChatMessage;
 import com.socialnetwork.chat_service.model.ChatRoom;
 import com.socialnetwork.chat_service.model.RoomMember;
 import com.socialnetwork.chat_service.model.RoomMemberId;
-import com.socialnetwork.chat_service.repository.ChatMessageRepository;
-import com.socialnetwork.chat_service.repository.ChatRoomRepository;
-import com.socialnetwork.chat_service.repository.RoomMemberRepository;
+import com.socialnetwork.chat_service.repository.mongo.ChatMessageRepository;
+import com.socialnetwork.chat_service.repository.jpa.ChatRoomRepository;
+import com.socialnetwork.chat_service.repository.jpa.RoomMemberRepository;
 import com.socialnetwork.chat_service.service.ConversationService;
 import exception.AccessDeniedException;
 import exception.BadRequestException;
@@ -48,6 +48,7 @@ public class ConversationServiceImpl implements ConversationService {
   @Transactional
   public ConversationResponse createConversation(ConversationCreateRequest req) {
     Long creatorId = getCurrentUserId();
+    System.out.println("Người tạo" + creatorId);
     UserProfileDto creatorProfile = userClient.getUserProfile(creatorId);
 
     if (Boolean.FALSE.equals(req.getIsGroup())) {

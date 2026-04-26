@@ -21,7 +21,7 @@ public class MessageController {
 
   // POST multipart to send (returns created message object)
   @PostMapping(consumes = "multipart/form-data")
-  public ResponseEntity<Map<String, Object>> sendMessage(@ModelAttribute MessageRequest req) {
+  public ResponseEntity<Map<String, Object>> sendMessage(@RequestBody MessageRequest req) {
     Map<String, Object> saved = messageService.sendMessage(req);
     return ResponseEntity.ok(saved);
   }

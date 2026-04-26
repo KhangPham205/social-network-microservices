@@ -7,9 +7,9 @@ import com.socialnetwork.chat_service.dto.UserProfileDto;
 import com.socialnetwork.chat_service.event.MessageNotificationEvent;
 import com.socialnetwork.chat_service.model.ChatMessage;
 import com.socialnetwork.chat_service.model.ChatRoom;
-import com.socialnetwork.chat_service.repository.ChatMessageRepository;
-import com.socialnetwork.chat_service.repository.ChatRoomRepository;
-import com.socialnetwork.chat_service.repository.RoomMemberRepository;
+import com.socialnetwork.chat_service.repository.mongo.ChatMessageRepository;
+import com.socialnetwork.chat_service.repository.jpa.ChatRoomRepository;
+import com.socialnetwork.chat_service.repository.jpa.RoomMemberRepository;
 import com.socialnetwork.chat_service.service.MessageService;
 import exception.AccessDeniedException;
 import exception.ResourceNotFoundException;
@@ -59,39 +59,38 @@ public class MessageServiceImpl implements MessageService {
   }
 
   private Map<String, Object> createAndSaveMessage(Long senderId, MessageRequest req) {
+    log.info("STEP 1 - start create message");
+    log.info("senderId={}", senderId);
+    log.info("conversationId={}", req.getConversationId());
+    log.info("content={}", req.getContent());
+
     UserProfileDto senderProfile = userClient.getUserProfile(senderId);
+    log.info("STEP 2 - got user profile {}", senderProfile.getDisplayName());
 
-    ChatRoom room =
-        chatRoomRepository
-            .findById(req.getConversationId())
-            .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+    ChatRoom room = chatRoomRepository
+        .findById(req.getConversationId())
+        .orElseThrow(() -> new RuntimeException("Room not found"));
 
-    ChatMessage message =
-        ChatMessage.builder()
-            .roomId(room.getId())
-            .senderId(senderId)
-            .senderName(senderProfile.getDisplayName())
-            .senderAvatar(senderProfile.getAvatarUrl())
-            .replyToId(req.getReplyToId())
-            .content(req.getContent())
-            .media(req.getMediaAttachments() != null ? req.getMediaAttachments() : List.of())
-            .createdAt(Instant.now())
-            .readBy(List.of(senderId))
-            .isDeleted(false)
-            .build();
+    log.info("STEP 3 - found room {}", room.getId());
 
-    ChatMessage savedMessage = chatMessageRepository.save(message);
+    ChatMessage message = ChatMessage.builder()
+        .roomId(room.getId())
+        .senderId(senderId)
+        .senderName(senderProfile.getDisplayName())
+        .senderAvatar(senderProfile.getAvatarUrl())
+        .content(req.getContent())
+        .createdAt(Instant.now())
+        .readBy(List.of(senderId))
+        .isDeleted(false)
+        .build();
 
-    // Update room timestamp
-    room.setUpdatedAt(Instant.now());
-    chatRoomRepository.save(room);
+    log.info("STEP 4 - before mongo save");
 
-    Map<String, Object> payload = convertToMapPayload(savedMessage);
-    messagingTemplate.convertAndSend("/topic/conversation/" + room.getId(), (Object) payload);
+    ChatMessage saved = chatMessageRepository.save(message);
 
-    publishNotificationEvent(room, senderProfile, req);
+    log.info("STEP 5 - mongo saved id={}", saved.getId());
 
-    return payload;
+    return convertToMapPayload(saved);
   }
 
   @Override

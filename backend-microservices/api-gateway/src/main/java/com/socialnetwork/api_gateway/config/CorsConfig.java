@@ -18,6 +18,7 @@ public class CorsConfig {
         List.of(
             "http://localhost:3000",
             "http://localhost:5173",
+            "http://localhost:5500/",
             "https://socius-front-end-2.vercel.app"));
 
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

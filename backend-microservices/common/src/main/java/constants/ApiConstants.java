@@ -40,7 +40,7 @@ public final class ApiConstants {
   public static final String FRIENDSHIP = API_V1 + "/friends";
 
   /** Đường dẫn gốc cho Message/Conversation Controller (Ví dụ: /api/v1/messages) */
-  public static final String MESSAGES = API_V1 + "/messages";
+  public static final String MESSAGES = API_V1 + "/chat/messages";
 
   /** Đường dẫn gốc cho Report Controller (Ví dụ: /api/v1/reports) */
   public static final String REPORTS = API_V1 + "/reports";

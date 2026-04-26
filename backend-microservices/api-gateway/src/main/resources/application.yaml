@@ -23,6 +23,8 @@ springdoc:
         url: /aggregate/media-service/v3/api-docs
       - name: Notification Service
         url: /aggregate/notification-service/v3/api-docs
+      - name: Chat Service
+        url: /aggregate/chat-service/v3/api-docs
 
 logging:
   level:

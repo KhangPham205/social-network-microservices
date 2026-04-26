@@ -1,6 +1,7 @@
 package com.socialnetwork.chat_service.config;
 
 import com.socialnetwork.chat_service.client.UserClient;
+import org.springframework.beans.factory.annotation.Qualifier; // Thêm import này
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,7 +26,7 @@ public class HttpExchangeConfig {
   }
 
   @Bean
-  public UserClient userClient(RestClient.Builder builder) {
+  public UserClient userClient(@Qualifier("microserviceBuilder") RestClient.Builder builder) {
     RestClient restClient = builder.baseUrl("http://user-service").build();
     RestClientAdapter adapter = RestClientAdapter.create(restClient);
     HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();

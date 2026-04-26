@@ -50,9 +50,23 @@ public class GatewayRoutesConfig {
                 r.path("/aggregate/notification-service/v3/api-docs/**")
                     .filters(f -> f.setPath("/v3/api-docs"))
                     .uri("lb://notification-service"))
+        .route("notification-ws", r -> r.path("/ws/notification/**").uri("lb:ws://notification-service"))
 
-        // ================= NOTIFICATION WS =================
-        .route("notification-ws", r -> r.path("/ws/**").uri("lb:ws://notification-service"))
+        // ================= CHAT =================
+        .route("chat-service", r -> r.path("/api/v1/chat/**").uri("lb://chat-service"))
+        .route(
+            "chat-service-swagger",
+            r ->
+                r.path("/aggregate/chat-service/v3/api-docs/**")
+                    .filters(f -> f.setPath("/v3/api-docs"))
+                    .uri("lb://chat-service"))
+        .route(
+            "chat-service-swagger-ui",
+            r ->
+                r.path("/aggregate/chat-service/swagger-ui/**")
+                    .filters(f -> f.setPath("/swagger-ui"))
+                    .uri("lb://chat-service"))
+        .route("chat-service-ws", r -> r.path("/ws/chat/**").uri("lb:ws://chat-service"))
         .build();
   }
 }

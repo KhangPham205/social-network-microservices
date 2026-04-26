@@ -34,13 +34,11 @@ public class UserServiceImpl implements UserService {
   private final UserRelaRepository userRelaRepository;
   private final FriendshipRepository friendshipRepository;
 
-  // --- HÀM LẤY ID TỪ TOKEN ---
   private Long getCurrentUserId() {
     String userIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
     return Long.parseLong(userIdStr);
   }
 
-  // --- 1. API NỘI BỘ: Tạo profile trống khi có user đăng ký ---
   @Override
   @Transactional
   public void createDefaultProfile(Long accountId, String displayName) {
@@ -53,7 +51,6 @@ public class UserServiceImpl implements UserService {
     userRepository.save(user);
   }
 
-  // --- 2. Lấy Profile ---
   @Override
   public UserProfileDto getProfile(Long userId) {
     User user =
@@ -61,9 +58,8 @@ public class UserServiceImpl implements UserService {
             .findById(userId)
             .orElseThrow(
                 () ->
-                    new RuntimeException(
-                        "User not found")); // Tạm dùng RuntimeException, bạn có thể thay bằng
-    // ResourceNotFoundException của bạn
+                    new ResourceNotFoundException(
+                        "User not found"));
 
     return UserProfileDto.builder()
         .id(user.getId())

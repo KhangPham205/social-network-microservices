@@ -20,7 +20,7 @@ public final class WebSocketConstants {
   // --- Các Endpoint xử lý tin nhắn (phía Server) ---
 
   /** Endpoint để client gửi tin nhắn chat. Được xử lý bởi: ChatController.handleChatMessage */
-  public static final String CHAT_SEND = APP_PREFIX + "/chat.send";
+  public static final String CHAT_SEND = "/chat.send";
 
   /** Endpoint để client thông báo tham gia chat. Được xử lý bởi: ChatController.addUser */
   public static final String CHAT_ADD_USER = APP_PREFIX + "/chat.addUser";
@@ -37,5 +37,5 @@ public final class WebSocketConstants {
    * Kênh chat chung của một cuộc hội thoại. Client sẽ subscribe: /queue/conversation/{id} Server
    * (MessageService) sẽ gửi tới: /queue/conversation/{id}
    */
-  public static final String CHAT_CONVERSATION_QUEUE = QUEUE_PREFIX + "/conversation";
+  public static final String CHAT_CONVERSATION_TOPIC = "/topic/conversation";
 }

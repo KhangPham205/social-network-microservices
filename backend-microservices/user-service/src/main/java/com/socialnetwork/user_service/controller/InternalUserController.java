@@ -1,8 +1,12 @@
 package com.socialnetwork.user_service.controller;
 
+import com.socialnetwork.user_service.dto.UserProfileDto;
+import com.socialnetwork.user_service.model.User;
 import com.socialnetwork.user_service.service.FriendshipService;
 import com.socialnetwork.user_service.service.UserService;
 import java.util.List;
+
+import exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,9 +28,14 @@ public class InternalUserController {
     return ResponseEntity.ok().build();
   }
 
+  @GetMapping("/{userId}")
+  public ResponseEntity<UserProfileDto> getUserProfileInternal(@PathVariable("userId") Long userId) {
+    return ResponseEntity.ok(userService.getProfile(userId));
+  }
+
   // Lấy danh sách ID của tất cả bạn bè + những người đang follow
   @GetMapping("/{userId}/network-ids")
-  public ResponseEntity<List<Long>> getNetworkIds(@PathVariable Long userId) {
+  public ResponseEntity<List<Long>> getNetworkIds(@PathVariable("userId") Long userId) {
     List<Long> networkIds = friendshipService.getNetworkIds(userId);
     return ResponseEntity.ok(networkIds);
   }

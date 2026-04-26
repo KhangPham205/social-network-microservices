@@ -1,4 +1,4 @@
-package com.socialnetwork.chat_service.repository;
+package com.socialnetwork.chat_service.repository.mongo;
 
 import com.socialnetwork.chat_service.model.ChatMessage;
 import java.util.Optional;

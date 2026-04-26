@@ -1,7 +1,6 @@
 package com.socialnetwork.chat_service.model;
 
 import com.socialnetwork.chat_service.enums.MessageType;
-import jakarta.persistence.Id;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
