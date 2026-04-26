@@ -50,7 +50,9 @@ public class GatewayRoutesConfig {
                 r.path("/aggregate/notification-service/v3/api-docs/**")
                     .filters(f -> f.setPath("/v3/api-docs"))
                     .uri("lb://notification-service"))
-        .route("notification-ws", r -> r.path("/ws/notification/**").uri("lb:ws://notification-service"))
+        .route(
+            "notification-ws",
+            r -> r.path("/ws/notification/**").uri("lb:ws://notification-service"))
 
         // ================= CHAT =================
         .route("chat-service", r -> r.path("/api/v1/chat/**").uri("lb://chat-service"))

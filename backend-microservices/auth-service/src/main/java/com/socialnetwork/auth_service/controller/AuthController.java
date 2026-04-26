@@ -1,11 +1,13 @@
 package com.socialnetwork.auth_service.controller;
 
 import com.socialnetwork.auth_service.dto.*;
+import com.socialnetwork.auth_service.security.JwtProvider;
 import com.socialnetwork.auth_service.service.AuthService;
 import com.socialnetwork.auth_service.service.PasswordResetService;
 import com.socialnetwork.auth_service.service.RefreshTokenService;
 import constants.ApiConstants;
 import jakarta.ws.rs.core.HttpHeaders;
+import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
@@ -20,6 +22,7 @@ public class AuthController {
   private final AuthService authService;
   private final RefreshTokenService refreshTokenService;
   private final PasswordResetService passwordResetService;
+  private final JwtProvider jwtProvider;
 
   @PostMapping("/register")
   public ResponseEntity<RegisterResponse> register(@RequestBody RegisterRequest request) {
@@ -51,8 +54,11 @@ public class AuthController {
     //    response.setToken(null);
 
     return ResponseEntity.ok()
-        .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-        .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+        .headers(
+            headers -> {
+              headers.add(HttpHeaders.SET_COOKIE, jwtCookie.toString());
+              headers.add(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+            })
         .body(response);
   }
 
@@ -68,8 +74,11 @@ public class AuthController {
         ResponseCookie.from("refreshToken", "").httpOnly(true).path("/").maxAge(0).build();
 
     return ResponseEntity.ok()
-        .header(HttpHeaders.SET_COOKIE, cleanJwtCookie.toString())
-        .header(HttpHeaders.SET_COOKIE, cleanRefreshCookie.toString())
+        .headers(
+            headers -> {
+              headers.add(HttpHeaders.SET_COOKIE, cleanJwtCookie.toString());
+              headers.add(HttpHeaders.SET_COOKIE, cleanRefreshCookie.toString());
+            })
         .body("Logged out successfully");
   }
 
@@ -90,6 +99,7 @@ public class AuthController {
             .maxAge(24 * 60 * 60)
             .sameSite("None")
             .build();
+
     ResponseCookie newRefreshCookie =
         ResponseCookie.from("refreshToken", newTokens.getRefreshToken())
             .httpOnly(true)
@@ -99,10 +109,15 @@ public class AuthController {
             .sameSite("None")
             .build();
 
+    List<String> userRole = jwtProvider.extractRoles(newTokens.getAccessToken());
+
     return ResponseEntity.ok()
-        .header(HttpHeaders.SET_COOKIE, newJwtCookie.toString())
-        .header(HttpHeaders.SET_COOKIE, newRefreshCookie.toString())
-        .body(Map.of("message", "Token refreshed successfully"));
+        .headers(
+            headers -> {
+              headers.add(HttpHeaders.SET_COOKIE, newJwtCookie.toString());
+              headers.add(HttpHeaders.SET_COOKIE, newRefreshCookie.toString());
+            })
+        .body(new RefreshTokenResponse("Token refreshed successfully", newTokens, userRole));
   }
 
   @PostMapping("/sendVerifyEmail")

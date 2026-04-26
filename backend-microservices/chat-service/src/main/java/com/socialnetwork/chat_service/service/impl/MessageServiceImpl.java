@@ -7,9 +7,9 @@ import com.socialnetwork.chat_service.dto.UserProfileDto;
 import com.socialnetwork.chat_service.event.MessageNotificationEvent;
 import com.socialnetwork.chat_service.model.ChatMessage;
 import com.socialnetwork.chat_service.model.ChatRoom;
-import com.socialnetwork.chat_service.repository.mongo.ChatMessageRepository;
 import com.socialnetwork.chat_service.repository.jpa.ChatRoomRepository;
 import com.socialnetwork.chat_service.repository.jpa.RoomMemberRepository;
+import com.socialnetwork.chat_service.repository.mongo.ChatMessageRepository;
 import com.socialnetwork.chat_service.service.MessageService;
 import exception.AccessDeniedException;
 import exception.ResourceNotFoundException;
@@ -67,22 +67,24 @@ public class MessageServiceImpl implements MessageService {
     UserProfileDto senderProfile = userClient.getUserProfile(senderId);
     log.info("STEP 2 - got user profile {}", senderProfile.getDisplayName());
 
-    ChatRoom room = chatRoomRepository
-        .findById(req.getConversationId())
-        .orElseThrow(() -> new RuntimeException("Room not found"));
+    ChatRoom room =
+        chatRoomRepository
+            .findById(req.getConversationId())
+            .orElseThrow(() -> new RuntimeException("Room not found"));
 
     log.info("STEP 3 - found room {}", room.getId());
 
-    ChatMessage message = ChatMessage.builder()
-        .roomId(room.getId())
-        .senderId(senderId)
-        .senderName(senderProfile.getDisplayName())
-        .senderAvatar(senderProfile.getAvatarUrl())
-        .content(req.getContent())
-        .createdAt(Instant.now())
-        .readBy(List.of(senderId))
-        .isDeleted(false)
-        .build();
+    ChatMessage message =
+        ChatMessage.builder()
+            .roomId(room.getId())
+            .senderId(senderId)
+            .senderName(senderProfile.getDisplayName())
+            .senderAvatar(senderProfile.getAvatarUrl())
+            .content(req.getContent())
+            .createdAt(Instant.now())
+            .readBy(List.of(senderId))
+            .isDeleted(false)
+            .build();
 
     log.info("STEP 4 - before mongo save");
 

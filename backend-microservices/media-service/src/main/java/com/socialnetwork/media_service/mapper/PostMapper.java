@@ -12,7 +12,7 @@ public interface PostMapper {
   @Mapping(source = "author.avatarUrl", target = "authorAvatar")
   @Mapping(source = "sharedPost", target = "sharedPost", qualifiedByName = "sharedPostToDto")
   @Mapping(source = "sharedPost.id", target = "sharedPostId")
-  @Mapping(source = "systemBan", target = "isSystemBan")
+  @Mapping(source = "isSystemBan", target = "isSystemBan")
   @Mapping(target = "reactSummary", ignore = true)
   @Mapping(target = "shareCount", ignore = true) // shareCount sẽ set bên service
   PostResponse toDto(Post post);

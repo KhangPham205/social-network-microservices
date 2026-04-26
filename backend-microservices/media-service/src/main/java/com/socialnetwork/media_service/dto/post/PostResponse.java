@@ -34,7 +34,7 @@ public class PostResponse {
   private long reportCount;
   private long complaintCount;
 
-  private boolean isSystemBan;
+  private Boolean isSystemBan;
 
   private Instant createdAt;
   private Instant updatedAt;

@@ -1,12 +1,9 @@
 package com.socialnetwork.user_service.controller;
 
 import com.socialnetwork.user_service.dto.UserProfileDto;
-import com.socialnetwork.user_service.model.User;
 import com.socialnetwork.user_service.service.FriendshipService;
 import com.socialnetwork.user_service.service.UserService;
 import java.util.List;
-
-import exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +26,8 @@ public class InternalUserController {
   }
 
   @GetMapping("/{userId}")
-  public ResponseEntity<UserProfileDto> getUserProfileInternal(@PathVariable("userId") Long userId) {
+  public ResponseEntity<UserProfileDto> getUserProfileInternal(
+      @PathVariable("userId") Long userId) {
     return ResponseEntity.ok(userService.getProfile(userId));
   }
 

@@ -6,6 +6,9 @@ spring:
   servlet:
     multipart:
       enabled: true
+  jackson:
+    deserialization:
+      fail-on-null-for-primitives: false
 
 springdoc:
   api-docs:

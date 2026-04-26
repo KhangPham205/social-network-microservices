@@ -45,7 +45,7 @@ public class Post {
   private int shareCount;
 
   @Column(name = "is_system_ban")
-  private boolean isSystemBan;
+  private Boolean isSystemBan;
 
   @Column(name = "deleted_at")
   private Instant deletedAt;

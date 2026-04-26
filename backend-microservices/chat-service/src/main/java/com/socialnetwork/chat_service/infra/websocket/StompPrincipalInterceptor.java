@@ -16,9 +16,7 @@ import org.springframework.stereotype.Component;
 public class StompPrincipalInterceptor implements ChannelInterceptor {
 
   @Override
-  public Message<?> preSend(
-      @NonNull Message<?> message,
-      @NonNull MessageChannel channel) {
+  public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
 
     StompHeaderAccessor accessor =
         StompHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
@@ -38,9 +36,7 @@ public class StompPrincipalInterceptor implements ChannelInterceptor {
       if (userId != null) {
         UsernamePasswordAuthenticationToken auth =
             new UsernamePasswordAuthenticationToken(
-                userId.toString(),
-                null,
-                Collections.emptyList());
+                userId.toString(), null, Collections.emptyList());
 
         accessor.setUser(auth);
 

@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,19 @@ public class JwtProvider {
     if (idObj instanceof Integer) return ((Integer) idObj).longValue();
     if (idObj instanceof Long) return (Long) idObj;
     return null;
+  }
+
+  public List<String> extractRoles(String token) {
+    List<String> rawRoles = getClaims(token).get("roles", List.class);
+
+    if (rawRoles == null || rawRoles.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    return rawRoles.stream()
+        .filter(r -> r != null && r.startsWith("ROLE_"))
+        .map(r -> r.substring(5))
+        .toList();
   }
 
   public boolean isTokenValid(String token, UserDetails userDetails) {

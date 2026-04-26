@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import utils.SecurityUtils;
 import vo.PageVO;
+import vo.friendship.FriendshipStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -56,10 +57,7 @@ public class UserServiceImpl implements UserService {
     User user =
         userRepository
             .findById(userId)
-            .orElseThrow(
-                () ->
-                    new ResourceNotFoundException(
-                        "User not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
     return UserProfileDto.builder()
         .id(user.getId())
@@ -150,8 +148,45 @@ public class UserServiceImpl implements UserService {
 
     Map<Long, UserRelationDto> relationDtos = mapPageToRelationDtos(viewerId, targets);
 
-    List<UserRelationDto> content = targets.stream().map(u -> relationDtos.get(u.getId())).toList();
+    List<UserRelationDto> content =
+        targets.stream()
+            .map(
+                u -> {
+                  UserRelationDto dto = relationDtos.get(u.getId());
 
+                  if (dto == null) {
+                    dto =
+                        UserRelationDto.builder()
+                            .id(u.getId())
+                            .displayName(u.getDisplayName())
+                            .avatarUrl(u.getAvatarUrl())
+                            .bio(u.getUserInfo() != null ? u.getUserInfo().getBio() : null)
+                            .favorites(
+                                u.getUserInfo() != null ? u.getUserInfo().getFavorites() : null)
+                            .dateOfBirth(
+                                u.getUserInfo() != null ? u.getUserInfo().getDateOfBirth() : null)
+                            .joinedAt(u.getCreatedAt())
+                            .isFollowing(false)
+                            .isFollowedBy(false)
+                            .friendship(
+                                FriendshipResponse.builder()
+                                    .status(FriendshipStatus.NONE)
+                                    .senderId(viewerId)
+                                    .receiverId(u.getId())
+                                    .build())
+                            .build();
+                  } else {
+                    if (dto.getFriendship() == null) {
+                      dto.setFriendship(
+                          FriendshipResponse.builder().status(FriendshipStatus.NONE).build());
+                    } else if (dto.getFriendship().getStatus() == null) {
+                      dto.getFriendship().setStatus(FriendshipStatus.NONE);
+                    }
+                  }
+
+                  return dto;
+                })
+            .toList();
     // 5. Return standard PageVO
     return PageVO.<UserRelationDto>builder()
         .page(page.getNumber())
