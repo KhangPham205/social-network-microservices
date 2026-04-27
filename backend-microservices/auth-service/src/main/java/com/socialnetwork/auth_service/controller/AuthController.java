@@ -64,14 +64,28 @@ public class AuthController {
 
   @PostMapping("/logout")
   public ResponseEntity<?> logout(@CookieValue(name = "jwt", required = false) String jwt) {
-    if (jwt == null || !jwt.isEmpty()) {
+
+    if (jwt != null && !jwt.isEmpty()) {
       authService.logout(jwt);
     }
 
     ResponseCookie cleanJwtCookie =
-        ResponseCookie.from("jwt", "").httpOnly(true).path("/").maxAge(0).build();
+        ResponseCookie.from("jwt", "")
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .sameSite("None")
+            .maxAge(0)
+            .build();
+
     ResponseCookie cleanRefreshCookie =
-        ResponseCookie.from("refreshToken", "").httpOnly(true).path("/").maxAge(0).build();
+        ResponseCookie.from("refreshToken", "")
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .sameSite("None")
+            .maxAge(0)
+            .build();
 
     return ResponseEntity.ok()
         .headers(

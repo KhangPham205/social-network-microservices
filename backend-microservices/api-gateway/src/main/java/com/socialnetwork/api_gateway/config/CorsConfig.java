@@ -18,16 +18,21 @@ public class CorsConfig {
         List.of(
             "http://localhost:3000",
             "http://localhost:5173",
-            "http://localhost:5500/",
+            "http://localhost:5500",
             "https://socius-front-end-2.vercel.app"));
 
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
     config.setAllowedHeaders(
-        List.of("Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"));
+        List.of(
+            "Origin",
+            "Content-Type",
+            "Accept",
+            "Authorization",
+            "X-Requested-With",
+            "ngrok-skip-browser-warning"));
 
     config.setAllowCredentials(true);
-
     config.setMaxAge(3600L);
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

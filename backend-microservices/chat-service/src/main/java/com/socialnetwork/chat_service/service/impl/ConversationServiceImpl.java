@@ -502,7 +502,7 @@ public class ConversationServiceImpl implements ConversationService {
     return Map.of(
         "id", msg.getId(),
         "content", msg.getContent() != null ? msg.getContent() : "",
-        "type", msg.getType().name(),
+        "type", msg.getType() != null ? msg.getType().name() : MessageType.TEXT.name(),
         "senderName", msg.getSenderName() != null ? msg.getSenderName() : "",
         "createdAt", msg.getCreatedAt().toString());
   }

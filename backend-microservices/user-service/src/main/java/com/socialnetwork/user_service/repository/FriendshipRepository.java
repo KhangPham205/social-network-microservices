@@ -4,7 +4,6 @@ import com.socialnetwork.user_service.model.Friendship;
 import com.socialnetwork.user_service.model.User;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -19,9 +18,15 @@ public interface FriendshipRepository
   Optional<Friendship> findBySenderAndReceiver(User sender, User receiver);
 
   @Query(
-      "SELECT f FROM Friendship f WHERE (f.sender.id = :viewerId AND f.receiver.id IN :targetIds) OR (f.sender.id IN :targetIds AND f.receiver.id = :viewerId)")
+      """
+    SELECT f FROM Friendship f
+    WHERE
+        (f.sender.id = :viewerId AND f.receiver.id IN :targetIds)
+        OR
+        (f.receiver.id = :viewerId AND f.sender.id IN :targetIds)
+""")
   List<Friendship> findFriendshipsBetween(
-      @Param("viewerId") Long viewerId, @Param("targetIds") Set<Long> targetIds);
+      @Param("viewerId") Long viewerId, @Param("targetIds") List<Long> targetIds);
 
   @Query(
       "SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM Friendship f WHERE ((f.sender = :user1 AND f.receiver = :user2) OR (f.sender = :user2 AND f.receiver = :user1)) AND f.status = 'FRIEND'")

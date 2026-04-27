@@ -12,6 +12,7 @@ import com.socialnetwork.user_service.repository.UserRelaRepository;
 import com.socialnetwork.user_service.repository.UserRepository;
 import com.socialnetwork.user_service.service.FriendshipService;
 import com.socialnetwork.user_service.utils.BlockUtils;
+import events.FriendRequestEvent;
 import exception.AccessDeniedException;
 import exception.BadRequestException;
 import exception.ResourceNotFoundException;
@@ -74,6 +75,8 @@ public class FriendshipServiceImpl implements FriendshipService {
           f.setReceiver(receiver);
           f.setStatus(FriendshipStatus.PENDING);
           friendshipRepository.save(f);
+          // Bắn event thông báo request được gửi lại
+          eventPublisher.publishEvent(FriendRequestEvent.friendRequest(userId, targetId));
           return new FriendshipResponse(
               "Friend request re-sent", FriendshipStatus.PENDING, userId, targetId);
         }
@@ -87,9 +90,8 @@ public class FriendshipServiceImpl implements FriendshipService {
             .status(FriendshipStatus.PENDING)
             .build());
 
-    // TODO Microservices: Bắn event để Notification-Service nhận (qua Kafka)
-    // eventPublisher.publishEvent(new NotificationEvent(sender.getId(), receiver.getId(),
-    // "FRIEND_REQUEST"));
+    // Bắn event để Notification-Service tạo thông báo (qua Kafka)
+    eventPublisher.publishEvent(FriendRequestEvent.friendRequest(userId, targetId));
 
     return new FriendshipResponse(
         "Friend request sent", FriendshipStatus.PENDING, userId, targetId);
@@ -309,7 +311,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     Set<Long> myFollowerIds =
         userRelaRepository.findFollowerIdsByViewerAndTargets(viewerId, targetIds);
     List<Friendship> bulkFriendships =
-        friendshipRepository.findFriendshipsBetween(viewerId, new HashSet<>(targetIds));
+        friendshipRepository.findFriendshipsBetween(viewerId, targetIds);
 
     Map<Long, FriendshipResponse> friendshipMap =
         bulkFriendships.stream()

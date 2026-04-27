@@ -1,6 +1,7 @@
 package com.socialnetwork.user_service.service.impl;
 
 import com.socialnetwork.user_service.dto.*;
+import com.socialnetwork.user_service.model.Friendship;
 import com.socialnetwork.user_service.model.User;
 import com.socialnetwork.user_service.model.UserInfo;
 import com.socialnetwork.user_service.model.UserRela;
@@ -9,13 +10,16 @@ import com.socialnetwork.user_service.repository.UserRelaRepository;
 import com.socialnetwork.user_service.repository.UserRepository;
 import com.socialnetwork.user_service.service.UserService;
 import exception.ResourceNotFoundException;
+import io.github.perplexhub.rsql.RSQLJPASupport;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -29,6 +33,7 @@ import vo.friendship.FriendshipStatus;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserServiceImpl implements UserService {
 
   private final UserRepository userRepository;
@@ -124,19 +129,21 @@ public class UserServiceImpl implements UserService {
       if (filter.contains("==") || filter.contains("=like=")) {
         spec = spec.and(io.github.perplexhub.rsql.RSQLJPASupport.toSpecification(filter));
       } else {
-        String likeFilter = "%" + filter.trim().toLowerCase() + "%";
         Specification<User> keywordSpec =
-            (root, query, cb) ->
-                cb.or(
-                    cb.like(cb.lower(root.get("displayName")), likeFilter),
-                    // Dùng LEFT JOIN để tránh lỗi mất data nếu user không có credential/userInfo
-                    cb.like(
-                        cb.lower(root.join("credential", JoinType.LEFT).get("username")),
-                        likeFilter),
-                    cb.like(cb.lower(root.join("userInfo", JoinType.LEFT).get("bio")), likeFilter),
-                    cb.like(
-                        cb.lower(root.join("userInfo", JoinType.LEFT).get("favorites")),
-                        likeFilter));
+            (root, query, cb) -> {
+              query.distinct(true);
+
+              var credentialJoin = root.join("credential", JoinType.LEFT);
+              var userInfoJoin = root.join("userInfo", JoinType.LEFT);
+
+              String likeFilter = "%" + filter.trim().toLowerCase() + "%";
+
+              return cb.or(
+                  cb.like(cb.lower(root.get("displayName")), likeFilter),
+                  cb.like(cb.lower(credentialJoin.get("username")), likeFilter),
+                  cb.like(cb.lower(userInfoJoin.get("bio")), likeFilter),
+                  cb.like(cb.lower(userInfoJoin.get("favorites")), likeFilter));
+            };
         spec = spec.and(keywordSpec);
       }
     }
@@ -347,6 +354,28 @@ public class UserServiceImpl implements UserService {
     Set<Long> myFollowerIds =
         userRelaRepository.findFollowerIdsByViewerAndTargets(viewerId, targetIds);
 
+    List<Friendship> friendships = friendshipRepository.findFriendshipsBetween(viewerId, targetIds);
+
+    Map<Long, FriendshipResponse> friendshipMap = new HashMap<>();
+
+    for (Friendship f : friendships) {
+      Long otherId;
+
+      if (f.getSender().getId().equals(viewerId)) {
+        otherId = f.getReceiver().getId();
+      } else {
+        otherId = f.getSender().getId();
+      }
+
+      friendshipMap.put(
+          otherId,
+          FriendshipResponse.builder()
+              .status(f.getStatus())
+              .senderId(f.getSender().getId())
+              .receiverId(f.getReceiver().getId())
+              .build());
+    }
+
     // 4. Map data vào DTO
     return targets.stream()
         .collect(
@@ -362,10 +391,14 @@ public class UserServiceImpl implements UserService {
                         // Check xem ID của họ có nằm trong Set mình vừa lấy lên không
                         .isFollowing(myFollowingIds.contains(target.getId()))
                         .isFollowedBy(myFollowerIds.contains(target.getId()))
-
-                        // TODO: Trạng thái Friendship (kết bạn) sẽ cập nhật sau khi có module
-                        // Friendship
-                        .friendship(null)
+                        .friendship(
+                            friendshipMap.getOrDefault(
+                                target.getId(),
+                                FriendshipResponse.builder()
+                                    .status(FriendshipStatus.NONE)
+                                    .senderId(viewerId)
+                                    .receiverId(target.getId())
+                                    .build()))
                         .build()));
   }
 
@@ -402,17 +435,31 @@ public class UserServiceImpl implements UserService {
       return null;
     }
 
+    filter = filter.trim();
+
+    // 🔥 thử parse RSQL trước
     if (filter.contains("==") || filter.contains("=like=")) {
-      return io.github.perplexhub.rsql.RSQLJPASupport.toSpecification(filter);
-    } else {
-      String likeFilter = "%" + filter.trim().toLowerCase() + "%";
-      return (root, query, cb) ->
-          cb.or(
-              cb.like(cb.lower(root.get("displayName")), likeFilter),
-              cb.like(cb.lower(root.join("credential", JoinType.LEFT).get("username")), likeFilter),
-              cb.like(cb.lower(root.join("userInfo", JoinType.LEFT).get("bio")), likeFilter),
-              cb.like(cb.lower(root.join("userInfo", JoinType.LEFT).get("favorites")), likeFilter));
+      try {
+        return RSQLJPASupport.toSpecification(filter);
+      } catch (Exception e) {
+        log.warn("Invalid RSQL filter: {}", filter);
+      }
     }
+
+    String likeFilter = "%" + filter.toLowerCase() + "%";
+
+    return (root, query, cb) -> {
+      query.distinct(true);
+
+      var credentialJoin = root.join("credential", JoinType.LEFT);
+      var userInfoJoin = root.join("userInfo", JoinType.LEFT);
+
+      return cb.or(
+          cb.like(cb.lower(root.get("displayName")), likeFilter),
+          cb.like(cb.lower(credentialJoin.get("username")), likeFilter),
+          cb.like(cb.lower(userInfoJoin.get("bio")), likeFilter),
+          cb.like(cb.lower(userInfoJoin.get("favorites")), likeFilter));
+    };
   }
 
   private UserRelationDto mapToRelationDto(User viewer, User target) {

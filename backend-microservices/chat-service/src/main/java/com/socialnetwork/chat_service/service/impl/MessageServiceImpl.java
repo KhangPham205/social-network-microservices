@@ -4,6 +4,7 @@ import com.socialnetwork.chat_service.client.UserClient;
 import com.socialnetwork.chat_service.dto.MessageRequest;
 import com.socialnetwork.chat_service.dto.MessageResponse;
 import com.socialnetwork.chat_service.dto.UserProfileDto;
+import com.socialnetwork.chat_service.enums.MessageType;
 import com.socialnetwork.chat_service.event.MessageNotificationEvent;
 import com.socialnetwork.chat_service.model.ChatMessage;
 import com.socialnetwork.chat_service.model.ChatRoom;
@@ -81,6 +82,10 @@ public class MessageServiceImpl implements MessageService {
             .senderName(senderProfile.getDisplayName())
             .senderAvatar(senderProfile.getAvatarUrl())
             .content(req.getContent())
+            .type(
+                (req.getContent() != null && !req.getContent().isBlank())
+                    ? MessageType.TEXT
+                    : MessageType.FILE)
             .createdAt(Instant.now())
             .readBy(List.of(senderId))
             .isDeleted(false)
@@ -196,6 +201,7 @@ public class MessageServiceImpl implements MessageService {
     map.put("senderName", msg.getSenderName());
     map.put("senderAvatar", msg.getSenderAvatar());
     map.put("content", msg.getContent());
+    map.put("type", msg.getType() != null ? msg.getType().name() : MessageType.TEXT.name());
     map.put("media", msg.getMedia());
     map.put("createdAt", msg.getCreatedAt() != null ? msg.getCreatedAt().toString() : null);
     map.put("isDeleted", msg.getIsDeleted());

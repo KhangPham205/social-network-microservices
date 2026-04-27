@@ -24,6 +24,9 @@ public class MinioStorageServiceImpl implements StorageService {
   @Value("${minio.url}")
   private String minioUrl;
 
+  @Value("${app.minio.public-url}")
+  private String publicUrl;
+
   @PostConstruct
   public void initBucket() {
     try {
@@ -62,7 +65,7 @@ public class MinioStorageServiceImpl implements StorageService {
               .contentType(file.getContentType())
               .build());
 
-      return minioUrl + "/" + bucketName + "/" + fileName;
+      return publicUrl + "/" + bucketName + "/" + fileName;
 
     } catch (Exception e) {
       log.error("Failed to upload file to Minio", e);
@@ -73,11 +76,12 @@ public class MinioStorageServiceImpl implements StorageService {
   @Override
   public void deleteFile(String fileUrl) {
     try {
-      // Cắt chuỗi URL để lấy tên object
-      String objectName = fileUrl.replace(minioUrl + "/" + bucketName + "/", "");
+      String objectName =
+          fileUrl.substring(fileUrl.indexOf(bucketName + "/") + bucketName.length() + 1);
 
       minioClient.removeObject(
           RemoveObjectArgs.builder().bucket(bucketName).object(objectName).build());
+
       log.info("Deleted file: {}", objectName);
     } catch (Exception e) {
       log.error("Failed to delete file from Minio: {}", fileUrl, e);

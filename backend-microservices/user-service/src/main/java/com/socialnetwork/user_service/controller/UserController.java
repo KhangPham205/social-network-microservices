@@ -70,7 +70,7 @@ public class UserController {
   }
 
   @GetMapping("/{id}/relation-status")
-  public ResponseEntity<UserRelationDto> getRelationStatus(@PathVariable Long id) {
+  public ResponseEntity<UserRelationDto> getRelationStatus(@PathVariable("id") Long id) {
     return ResponseEntity.ok(userService.getRelationWithUser(id));
   }
 }
