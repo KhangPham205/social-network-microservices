@@ -25,6 +25,9 @@ public class KafkaProducerConfig {
     configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
     configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JacksonJsonSerializer.class);
+    configProps.put(
+        JacksonJsonSerializer.TYPE_MAPPINGS,
+        "eventAccept:com.socialnetwork.user_service.events.FriendshipAcceptedEvent,eventDelete:com.socialnetwork.user_service.events.FriendshipDeletedEvent");
 
     return new DefaultKafkaProducerFactory<>(configProps);
   }

@@ -2,6 +2,7 @@
 package com.socialnetwork.chat_service.controller;
 
 import com.socialnetwork.chat_service.dto.*;
+import com.socialnetwork.chat_service.enums.ChatLabel;
 import com.socialnetwork.chat_service.service.ConversationService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -71,5 +72,26 @@ public class ConversationController {
     Long currentUserId = SecurityUtils.getCurrentUserId();
     return ResponseEntity.ok(
         conversationService.getConversationById(currentUserId, conversationId));
+  }
+
+  @PostMapping("/{roomId}/labels")
+  public ResponseEntity<?> addLabel(
+      @PathVariable("roomId") Long roomId, @RequestParam ChatLabel label) {
+
+    conversationService.addLabelToConversation(roomId, label);
+    return ResponseEntity.ok("Đã gắn nhãn thành công");
+  }
+
+  @DeleteMapping("/{roomId}/labels")
+  public ResponseEntity<?> removeLabel(
+      @PathVariable("roomId") Long roomId, @RequestParam ChatLabel label) {
+
+    conversationService.removeLabelFromConversation(roomId, label);
+    return ResponseEntity.ok("Đã gỡ nhãn thành công");
+  }
+
+  @GetMapping("/labels/all")
+  public ResponseEntity<?> getAllAvailableLabels() {
+    return ResponseEntity.ok(ChatLabel.values());
   }
 }

@@ -133,14 +133,12 @@ public class UserServiceImpl implements UserService {
             (root, query, cb) -> {
               query.distinct(true);
 
-              var credentialJoin = root.join("credential", JoinType.LEFT);
               var userInfoJoin = root.join("userInfo", JoinType.LEFT);
 
               String likeFilter = "%" + filter.trim().toLowerCase() + "%";
 
               return cb.or(
                   cb.like(cb.lower(root.get("displayName")), likeFilter),
-                  cb.like(cb.lower(credentialJoin.get("username")), likeFilter),
                   cb.like(cb.lower(userInfoJoin.get("bio")), likeFilter),
                   cb.like(cb.lower(userInfoJoin.get("favorites")), likeFilter));
             };
@@ -451,12 +449,10 @@ public class UserServiceImpl implements UserService {
     return (root, query, cb) -> {
       query.distinct(true);
 
-      var credentialJoin = root.join("credential", JoinType.LEFT);
       var userInfoJoin = root.join("userInfo", JoinType.LEFT);
 
       return cb.or(
           cb.like(cb.lower(root.get("displayName")), likeFilter),
-          cb.like(cb.lower(credentialJoin.get("username")), likeFilter),
           cb.like(cb.lower(userInfoJoin.get("bio")), likeFilter),
           cb.like(cb.lower(userInfoJoin.get("favorites")), likeFilter));
     };

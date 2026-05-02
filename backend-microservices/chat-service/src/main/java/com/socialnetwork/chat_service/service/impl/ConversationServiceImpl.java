@@ -2,6 +2,7 @@ package com.socialnetwork.chat_service.service.impl;
 
 import com.socialnetwork.chat_service.client.UserClient;
 import com.socialnetwork.chat_service.dto.*;
+import com.socialnetwork.chat_service.enums.ChatLabel;
 import com.socialnetwork.chat_service.enums.ConversationRole;
 import com.socialnetwork.chat_service.enums.MessageType;
 import com.socialnetwork.chat_service.model.ChatMessage;
@@ -143,7 +144,7 @@ public class ConversationServiceImpl implements ConversationService {
           room.getId(), profile, profile.getDisplayName() + " đã cập nhật thông tin nhóm.");
     }
 
-    return toConversationSummaryDto(room, currentUserId);
+    return toConversationSummaryDto(room, member, currentUserId);
   }
 
   @Override
@@ -169,7 +170,8 @@ public class ConversationServiceImpl implements ConversationService {
             .distinct()
             .toList();
 
-    if (newMemberIds.isEmpty()) return toConversationSummaryDto(room, currentUserId);
+    if (newMemberIds.isEmpty())
+      return toConversationSummaryDto(room, currentUserMember, currentUserId);
 
     List<RoomMember> newMembers = new ArrayList<>();
     List<String> addedNames = new ArrayList<>();
@@ -198,7 +200,7 @@ public class ConversationServiceImpl implements ConversationService {
         currentUserProfile,
         currentUserProfile.getDisplayName() + " đã thêm " + addedNamesStr + " vào nhóm.");
 
-    return toConversationSummaryDto(room, currentUserId);
+    return toConversationSummaryDto(room, currentUserMember, currentUserId);
   }
 
   @Override
@@ -236,7 +238,7 @@ public class ConversationServiceImpl implements ConversationService {
             + targetProfile.getDisplayName()
             + " khỏi nhóm.");
 
-    return toConversationSummaryDto(room, currentUserId);
+    return toConversationSummaryDto(room, currentUserMember, currentUserId);
   }
 
   @Override
@@ -318,7 +320,7 @@ public class ConversationServiceImpl implements ConversationService {
             + request.getNewRole().name()
             + ".");
 
-    return toConversationSummaryDto(room, currentUserId);
+    return toConversationSummaryDto(room, currentUserMember, currentUserId);
   }
 
   @Override
@@ -355,14 +357,42 @@ public class ConversationServiceImpl implements ConversationService {
   }
 
   @Override
+  @Transactional
+  public void addLabelToConversation(Long roomId, ChatLabel label) {
+    Long currentUserId = getCurrentUserId();
+
+    RoomMember member =
+        roomMemberRepository
+            .findByIdRoomIdAndIdUserId(roomId, currentUserId)
+            .orElseThrow(
+                () -> new AccessDeniedException("You are not a member of this conversation"));
+
+    member.getLabels().add(label);
+    roomMemberRepository.save(member);
+  }
+
+  @Override
+  @Transactional
+  public void removeLabelFromConversation(Long roomId, ChatLabel label) {
+    Long currentUserId = getCurrentUserId();
+
+    RoomMember member =
+        roomMemberRepository
+            .findByIdRoomIdAndIdUserId(roomId, currentUserId)
+            .orElseThrow(
+                () -> new AccessDeniedException("You are not a member of this conversation"));
+
+    member.getLabels().remove(label);
+    roomMemberRepository.save(member);
+  }
+
+  @Override
   @Transactional(readOnly = true)
   public List<ConversationSummaryResponse> getUserConversations(Long userId) {
     List<RoomMember> members = roomMemberRepository.findRoomsByUserId(userId);
 
     return members.stream()
-        .map(RoomMember::getChatRoom)
-        .distinct()
-        .map(room -> toConversationSummaryDto(room, userId))
+        .map(member -> toConversationSummaryDto(member.getChatRoom(), member, userId))
         .sorted((a, b) -> b.getUpdatedAt().compareTo(a.getUpdatedAt()))
         .collect(Collectors.toList());
   }
@@ -375,11 +405,12 @@ public class ConversationServiceImpl implements ConversationService {
             .findById(conversationId)
             .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
 
-    if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(conversationId, currentUserId)) {
-      throw new AccessDeniedException("Not a member.");
-    }
+    RoomMember currentMember =
+        roomMemberRepository
+            .findByIdRoomIdAndIdUserId(conversationId, currentUserId)
+            .orElseThrow(() -> new AccessDeniedException("Not a member."));
 
-    return toConversationSummaryDto(room, currentUserId);
+    return toConversationSummaryDto(room, currentMember, currentUserId);
   }
 
   // ------------------------- HELPER METHODS -------------------------
@@ -410,7 +441,8 @@ public class ConversationServiceImpl implements ConversationService {
     messagingTemplate.convertAndSend("/topic/conversation/" + roomId, sysMsg);
   }
 
-  private ConversationSummaryResponse toConversationSummaryDto(ChatRoom room, Long viewerId) {
+  private ConversationSummaryResponse toConversationSummaryDto(
+      ChatRoom room, RoomMember currentMember, Long viewerId) {
     ChatMessage lastMessage =
         chatMessageRepository.findFirstByRoomIdOrderByCreatedAtDesc(room.getId()).orElse(null);
     Map<String, Object> lastMsgMap =
@@ -450,6 +482,7 @@ public class ConversationServiceImpl implements ConversationService {
         .isGroup(room.getIsGroup())
         .lastMessage(lastMsgMap)
         .participants(participants)
+        .labels(currentMember != null ? currentMember.getLabels() : Collections.emptySet())
         .updatedAt(room.getUpdatedAt())
         .build();
   }
@@ -505,5 +538,45 @@ public class ConversationServiceImpl implements ConversationService {
         "type", msg.getType() != null ? msg.getType().name() : MessageType.TEXT.name(),
         "senderName", msg.getSenderName() != null ? msg.getSenderName() : "",
         "createdAt", msg.getCreatedAt().toString());
+  }
+
+  @Override
+  @Transactional
+  public ConversationResponse createConversationForFriends(Long userId1, Long userId2) {
+    // Kiểm tra xem conversation đã tồn tại chưa
+    Optional<ChatRoom> existing = chatRoomRepository.findExistingPrivateRoom(userId1, userId2);
+    if (existing.isPresent()) {
+      log.info("Conversation already exists between users {} and {}", userId1, userId2);
+      return mapToResponse(existing.get());
+    }
+
+    // Tạo conversation mới
+    ChatRoom room =
+        ChatRoom.builder().isGroup(false).createdAt(Instant.now()).updatedAt(Instant.now()).build();
+
+    ChatRoom savedRoom = chatRoomRepository.save(room);
+
+    // Thêm cả 2 người vào conversation
+    List<RoomMember> membersToSave = new ArrayList<>();
+    membersToSave.add(
+        RoomMember.builder()
+            .id(new RoomMemberId(savedRoom.getId(), userId1))
+            .chatRoom(savedRoom)
+            .joinedAt(Instant.now())
+            .role(ConversationRole.MEMBER)
+            .build());
+
+    membersToSave.add(
+        RoomMember.builder()
+            .id(new RoomMemberId(savedRoom.getId(), userId2))
+            .chatRoom(savedRoom)
+            .joinedAt(Instant.now())
+            .role(ConversationRole.MEMBER)
+            .build());
+
+    roomMemberRepository.saveAll(membersToSave);
+
+    log.info("Successfully created private conversation between users {} and {}", userId1, userId2);
+    return mapToResponse(savedRoom);
   }
 }

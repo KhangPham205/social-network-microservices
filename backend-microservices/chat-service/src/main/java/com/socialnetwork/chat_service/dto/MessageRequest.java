@@ -1,8 +1,8 @@
 package com.socialnetwork.chat_service.dto;
 
 import java.util.List;
-import java.util.Map;
 import lombok.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @Data
 @NoArgsConstructor
@@ -14,5 +14,5 @@ public class MessageRequest {
   private Long replyToId;
 
   // Có thể gửi nhiều file
-  private List<Map<String, Object>> mediaAttachments;
+  private List<MultipartFile> mediaFiles;
 }

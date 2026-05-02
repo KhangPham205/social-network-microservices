@@ -40,7 +40,7 @@ public class NotificationController {
 
   // 2. Đánh dấu 1 thông báo là đã đọc
   @PutMapping("/{id}/read")
-  public ResponseEntity<NotificationDto> markAsRead(@PathVariable Long id) {
+  public ResponseEntity<NotificationDto> markAsRead(@PathVariable("id") Long id) {
     Long userId = getCurrentUserId();
     log.info("Marking notification {} as read for user: {}", id, userId);
     return ResponseEntity.ok(notificationService.markAsRead(userId, id));

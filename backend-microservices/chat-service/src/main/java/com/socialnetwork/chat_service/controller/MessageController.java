@@ -8,6 +8,7 @@ import constants.ApiConstants;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vo.CursorPage;
@@ -19,9 +20,13 @@ public class MessageController {
 
   private final MessageService messageService;
 
-  // POST multipart to send (returns created message object)
-  @PostMapping(consumes = "multipart/form-data")
-  public ResponseEntity<Map<String, Object>> sendMessage(@RequestBody MessageRequest req) {
+  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<Map<String, Object>> sendMessage(@ModelAttribute MessageRequest req) {
+
+    // if (req.getMediaFiles() != null) {
+    //     log.info("Received {} files", req.getMediaFiles().size());
+    // }
+
     Map<String, Object> saved = messageService.sendMessage(req);
     return ResponseEntity.ok(saved);
   }

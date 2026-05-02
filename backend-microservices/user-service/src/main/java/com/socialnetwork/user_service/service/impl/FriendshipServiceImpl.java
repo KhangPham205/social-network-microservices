@@ -2,8 +2,7 @@ package com.socialnetwork.user_service.service.impl;
 
 import com.socialnetwork.user_service.dto.FriendshipResponse;
 import com.socialnetwork.user_service.dto.UserRelationDto;
-import com.socialnetwork.user_service.events.FriendshipAcceptedEvent;
-import com.socialnetwork.user_service.events.FriendshipDeletedEvent;
+import com.socialnetwork.user_service.event.EventPublisher;
 import com.socialnetwork.user_service.model.Friendship;
 import com.socialnetwork.user_service.model.User;
 import com.socialnetwork.user_service.model.UserRela;
@@ -12,7 +11,6 @@ import com.socialnetwork.user_service.repository.UserRelaRepository;
 import com.socialnetwork.user_service.repository.UserRepository;
 import com.socialnetwork.user_service.service.FriendshipService;
 import com.socialnetwork.user_service.utils.BlockUtils;
-import events.FriendRequestEvent;
 import exception.AccessDeniedException;
 import exception.BadRequestException;
 import exception.ResourceNotFoundException;
@@ -38,14 +36,9 @@ public class FriendshipServiceImpl implements FriendshipService {
   private final UserRepository userRepository;
   private final UserRelaRepository userRelaRepository;
   private final BlockUtils blockUtils;
+  private final EventPublisher eventPublisher;
 
-  // MICROSERVICES: Thay vì Inject trực tiếp NotificationService/ConversationService,
-  // chúng ta bắn Event. Một Listener sẽ bắt event này và gửi message qua Kafka.
-  private final ApplicationEventPublisher eventPublisher;
-
-  // =================================================================================
-  // ACTIONS
-  // =================================================================================
+  private final ApplicationEventPublisher applicationEventPublisher;
 
   @Override
   @Transactional
@@ -75,8 +68,6 @@ public class FriendshipServiceImpl implements FriendshipService {
           f.setReceiver(receiver);
           f.setStatus(FriendshipStatus.PENDING);
           friendshipRepository.save(f);
-          // Bắn event thông báo request được gửi lại
-          eventPublisher.publishEvent(FriendRequestEvent.friendRequest(userId, targetId));
           return new FriendshipResponse(
               "Friend request re-sent", FriendshipStatus.PENDING, userId, targetId);
         }
@@ -90,8 +81,13 @@ public class FriendshipServiceImpl implements FriendshipService {
             .status(FriendshipStatus.PENDING)
             .build());
 
-    // Bắn event để Notification-Service tạo thông báo (qua Kafka)
-    eventPublisher.publishEvent(FriendRequestEvent.friendRequest(userId, targetId));
+    eventPublisher.publishNotificationEvent(
+        userId, // actorId (Người gửi)
+        targetId, // receiverId (Người nhận)
+        null, // postId (Không có)
+        null, // targetId phụ (Không có)
+        "FRIEND_REQUEST" // Type
+        );
 
     return new FriendshipResponse(
         "Friend request sent", FriendshipStatus.PENDING, userId, targetId);
@@ -118,8 +114,14 @@ public class FriendshipServiceImpl implements FriendshipService {
     if (!userRelaRepository.existsByFollowerAndFollowing(receiver, sender))
       userRelaRepository.save(UserRela.builder().follower(receiver).following(sender).build());
 
-    // Bắn Event để Message-Service tạo Conversation & Notification-Service tạo thông báo
-    eventPublisher.publishEvent(new FriendshipAcceptedEvent(senderId, receiverId));
+    eventPublisher.publishNotificationEvent(
+        receiverId, // actorId (Người bấm chấp nhận)
+        senderId, // receiverId (Người nhận được thông báo)
+        null,
+        null,
+        "FRIEND_ACCEPT");
+
+    eventPublisher.publishFriendshipAcceptedEvent(senderId, receiverId);
 
     return new FriendshipResponse(
         "Friend request accepted", FriendshipStatus.FRIEND, senderId, receiverId);
@@ -153,7 +155,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     userRelaRepository.deleteByFollowerAndFollowing(u1, u2);
     userRelaRepository.deleteByFollowerAndFollowing(u2, u1);
 
-    eventPublisher.publishEvent(new FriendshipDeletedEvent(userId, friendId));
+    eventPublisher.publishFriendshipDeletedEvent(userId, friendId);
     return new FriendshipResponse(
         "Unfriended successfully", FriendshipStatus.REJECTED, userId, friendId);
   }
@@ -181,7 +183,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     f.setStatus(FriendshipStatus.BLOCKED);
     friendshipRepository.save(f);
 
-    eventPublisher.publishEvent(new FriendshipDeletedEvent(userId, targetId));
+    //    eventPublisher.publishEvent(new FriendshipDeletedEvent(userId, targetId));
     return new FriendshipResponse(
         "User blocked successfully", FriendshipStatus.BLOCKED, userId, targetId);
   }

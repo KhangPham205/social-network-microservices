@@ -1,10 +1,14 @@
 package com.socialnetwork.chat_service.service;
 
 import com.socialnetwork.chat_service.dto.*;
+import com.socialnetwork.chat_service.enums.ChatLabel;
 import java.util.List;
 
 public interface ConversationService {
   ConversationResponse createConversation(ConversationCreateRequest req);
+
+  /** Tạo conversation private giữa 2 người khi kết bạn (được gọi từ event listener) */
+  ConversationResponse createConversationForFriends(Long userId1, Long userId2);
 
   ConversationSummaryResponse updateConversation(
       Long currentUserId, UpdateConversationRequest request);
@@ -23,4 +27,8 @@ public interface ConversationService {
   ConversationSummaryResponse getConversationById(Long currentUserId, Long conversationId);
 
   void markMessageAsRead(Long userId, MarkReadRequest request);
+
+  void addLabelToConversation(Long roomId, ChatLabel label);
+
+  void removeLabelFromConversation(Long roomId, ChatLabel label);
 }

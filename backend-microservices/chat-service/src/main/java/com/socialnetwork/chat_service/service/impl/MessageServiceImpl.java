@@ -15,6 +15,7 @@ import com.socialnetwork.chat_service.service.MessageService;
 import exception.AccessDeniedException;
 import exception.ResourceNotFoundException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +96,9 @@ public class MessageServiceImpl implements MessageService {
 
     ChatMessage saved = chatMessageRepository.save(message);
 
+    messagingTemplate.convertAndSend(
+        "/queue/conversation/" + room.getId(), (Object) convertToMapPayload(saved));
+
     log.info("STEP 5 - mongo saved id={}", saved.getId());
 
     return convertToMapPayload(saved);
@@ -125,14 +129,14 @@ public class MessageServiceImpl implements MessageService {
     String nextCursor =
         slice.hasNext() ? slice.getContent().get(slice.getContent().size() - 1).getId() : null;
 
+    Collections.reverse(content);
+
     return new CursorPage<>(content, nextCursor);
   }
 
   @Override
   public List<Map<String, Object>> getMessages(Long conversationId) {
-    // Chỉ dùng cho internal/admin, cẩn thận với lượng dữ liệu lớn
-    return chatMessageRepository.findAll().stream()
-        .filter(m -> m.getRoomId().equals(conversationId))
+    return chatMessageRepository.findByRoomIdOrderByCreatedAtDesc(conversationId).stream()
         .map(this::convertToMapPayload)
         .collect(Collectors.toList());
   }

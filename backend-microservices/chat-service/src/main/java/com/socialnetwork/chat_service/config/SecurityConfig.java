@@ -24,13 +24,15 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.csrf(AbstractHttpConfigurer::disable)
-        .cors(AbstractHttpConfigurer::disable) // Tắt CORS cục bộ, Gateway đã lo
+        .cors(AbstractHttpConfigurer::disable)
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
-                    .requestMatchers("/ws/**")
+                    .requestMatchers("/error")
+                    .permitAll()
+                    .requestMatchers("/ws/chat/**")
                     .permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**")
                     .permitAll()

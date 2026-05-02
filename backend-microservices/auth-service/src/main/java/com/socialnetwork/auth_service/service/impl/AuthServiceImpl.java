@@ -19,7 +19,6 @@ import events.UserCreatedEvent;
 import exception.BadRequestException;
 import exception.InvalidCredentialsException;
 import exception.ResourceNotFoundException;
-import jakarta.transaction.Transactional;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.HashSet;
@@ -33,6 +32,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -123,11 +123,13 @@ public class AuthServiceImpl implements AuthService {
   }
 
   @Override
+  @Transactional
   public void logout(String accessToken) {
     String username = jwtProvider.extractUsername(accessToken);
     userCredentialRepository
         .findByUsername(username)
         .ifPresent(refreshTokenRepository::deleteByUser);
+
     SecurityContextHolder.clearContext();
   }
 

@@ -1,6 +1,7 @@
 package com.socialnetwork.chat_service.repository.mongo;
 
 import com.socialnetwork.chat_service.model.ChatMessage;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -18,4 +19,9 @@ public interface ChatMessageRepository extends MongoRepository<ChatMessage, Stri
 
   // Lấy trang đầu tiên (khi chưa có cursor)
   Slice<ChatMessage> findByRoomIdOrderByCreatedAtDesc(Long roomId, Pageable pageable);
+
+  List<ChatMessage> findByRoomIdOrderByCreatedAtAsc(Long roomId);
+
+  // Đổi Asc thành Desc
+  List<ChatMessage> findByRoomIdOrderByCreatedAtDesc(Long roomId);
 }
