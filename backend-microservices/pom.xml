@@ -18,6 +18,7 @@
         <module>media-service</module>
         <module>notification-service</module>
         <module>chat-service</module>
+        <module>moderation-service</module>
         <module>common</module>
     </modules>
 

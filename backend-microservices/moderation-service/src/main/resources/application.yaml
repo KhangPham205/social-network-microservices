@@ -1,0 +1,33 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: moderation-service
+  profiles:
+    active: dev
+  datasource:
+    url: jdbc:postgresql://localhost:5437/moderation_db
+    username: postgres
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: moderation-service-group
+      auto-offset-reset: earliest
+  swagger-ui:
+    path: /swagger-ui.html
+    server:
+      url: http://localhost:8080
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
