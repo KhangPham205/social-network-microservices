@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ModerationResult {
-    private boolean isToxic;
-    private String reason;
+  private boolean isToxic;
+  private String reason;
 }

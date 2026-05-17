@@ -10,12 +10,12 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface ReportMapper {
 
-    // Map Report -> ReportResponse
-    @Mapping(source = "reporterId", target = "reporterId")
-    @Mapping(source = "status", target = "status")
-    ReportResponse toResponse(Report report);
+  // Map Report -> ReportResponse
+  @Mapping(source = "reporterId", target = "reporterId")
+  @Mapping(source = "status", target = "status")
+  ReportResponse toResponse(Report report);
 
-    // Map Complaint -> ComplaintResponse
-    @Mapping(source = "userId", target = "userId")
-    ComplaintResponse toResponse(Complaint complaint);
+  // Map Complaint -> ComplaintResponse
+  @Mapping(source = "userId", target = "userId")
+  ComplaintResponse toResponse(Complaint complaint);
 }

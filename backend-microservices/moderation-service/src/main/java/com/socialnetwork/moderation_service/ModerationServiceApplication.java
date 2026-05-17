@@ -8,8 +8,7 @@ import org.springframework.kafka.annotation.EnableKafka;
 @EnableKafka
 public class ModerationServiceApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(ModerationServiceApplication.class, args);
-	}
-
+  public static void main(String[] args) {
+    SpringApplication.run(ModerationServiceApplication.class, args);
+  }
 }

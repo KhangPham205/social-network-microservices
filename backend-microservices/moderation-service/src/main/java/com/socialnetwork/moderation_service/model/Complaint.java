@@ -17,22 +17,22 @@ import vo.TargetType;
 @AllArgsConstructor
 public class Complaint extends BaseEntity {
 
-    @Column(name = "status")
-    private ComplaintStatus status;
+  @Column(name = "status")
+  private ComplaintStatus status;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private TargetType targetType; // POST, COMMENT, USER
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private TargetType targetType; // POST, COMMENT, USER
 
-    @Column(nullable = false)
-    private String targetId; // ID of post/comment/user
+  @Column(nullable = false)
+  private String targetId; // ID of post/comment/user
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId; // ID of complainant (not entity reference)
+  @Column(name = "user_id", nullable = false)
+  private Long userId; // ID of complainant (not entity reference)
 
-    @Column(columnDefinition = "TEXT")
-    private String content; // Reason for complaint
+  @Column(columnDefinition = "TEXT")
+  private String content; // Reason for complaint
 
-    @Column(columnDefinition = "TEXT")
-    private String adminResponse;
+  @Column(columnDefinition = "TEXT")
+  private String adminResponse;
 }

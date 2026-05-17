@@ -18,16 +18,16 @@ import vo.TargetType;
 @AllArgsConstructor
 public class ModerationLog extends BaseEntity {
 
-    @Enumerated(EnumType.STRING)
-    private TargetType targetType; // POST, COMMENT, USER
+  @Enumerated(EnumType.STRING)
+  private TargetType targetType; // POST, COMMENT, USER
 
-    private String targetId;
+  private String targetId;
 
-    private String action; // AUTO_BAN, ADMIN_BAN, ADMIN_RESTORE
+  private String action; // AUTO_BAN, ADMIN_BAN, ADMIN_RESTORE
 
-    private String reason;
+  private String reason;
 
-    // Actor ID (who performed the action) - null if automated
-    @Column(name = "actor_id")
-    private Long actorId;
+  // Actor ID (who performed the action) - null if automated
+  @Column(name = "actor_id")
+  private Long actorId;
 }

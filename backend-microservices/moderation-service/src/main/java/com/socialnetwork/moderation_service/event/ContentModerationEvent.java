@@ -1,15 +1,13 @@
-package com.socialnetwork.moderation_service.dto;
+package com.socialnetwork.moderation_service.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import vo.TargetType;
 
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
-public class CreateComplaintRequest {
+public class ContentModerationEvent {
   private String targetId;
   private TargetType targetType;
-  private String reason;
+  private String action; // "BLOCK" hoặc "UNBLOCK"
 }

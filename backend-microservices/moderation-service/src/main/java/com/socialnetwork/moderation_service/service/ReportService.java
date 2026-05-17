@@ -2,26 +2,33 @@ package com.socialnetwork.moderation_service.service;
 
 import com.socialnetwork.moderation_service.dto.*;
 import com.socialnetwork.moderation_service.enums.ComplaintStatus;
+import java.util.List;
 import org.springframework.data.domain.Pageable;
 import vo.PageVO;
 import vo.TargetType;
 
-import java.util.List;
-
 public interface ReportService {
-    // Report
-    ReportResponse createReport(Long reporterId, CreateReportRequest request);
-    List<ReportResponse> updateReport(UpdateReportRequest request);
-    ReportResponse getReportById(Long reportId);
-    PageVO<ReportResponse> getReports(String filter, Pageable pageable);
+  // Report
+  ReportResponse createReport(Long reporterId, CreateReportRequest request);
 
-    // Complaint
-    ComplaintResponse createComplaint(CreateComplaintRequest request);
-    ComplaintResponse updateComplaint(Long id, ComplaintStatus status);
-    PageVO<ComplaintResponse> getComplaints(String filter, Pageable pageable);
-    ComplaintResponse getComplaintById(Long id);
+  List<ReportResponse> updateReport(UpdateReportRequest request);
 
-    PageVO<ReportResponse> getReportsByContent(String targetId, TargetType targetType, Pageable pageable);
-    PageVO<ComplaintResponse> getComplaintsByContent(String targetId, TargetType targetType, Pageable pageable);
+  ReportResponse getReportById(Long reportId);
 
+  PageVO<ReportResponse> getReports(String filter, Pageable pageable);
+
+  // Complaint
+  ComplaintResponse createComplaint(CreateComplaintRequest request);
+
+  ComplaintResponse updateComplaint(Long id, ComplaintStatus status);
+
+  PageVO<ComplaintResponse> getComplaints(String filter, Pageable pageable);
+
+  ComplaintResponse getComplaintById(Long id);
+
+  PageVO<ReportResponse> getReportsByContent(
+      String targetId, TargetType targetType, Pageable pageable);
+
+  PageVO<ComplaintResponse> getComplaintsByContent(
+      String targetId, TargetType targetType, Pageable pageable);
 }

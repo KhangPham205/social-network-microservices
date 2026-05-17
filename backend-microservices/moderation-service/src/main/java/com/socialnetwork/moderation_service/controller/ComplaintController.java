@@ -16,46 +16,38 @@ import vo.PageVO;
 @RequiredArgsConstructor
 public class ComplaintController {
 
-    private final ReportService reportService;
+  private final ReportService reportService;
 
-    /**
-     * User tạo khiếu nại (Complaint)
-     */
-    @PostMapping
-    @PreAuthorize("hasAuthority('COMPLAINT:CREATE')")
-    public ResponseEntity<ComplaintResponse> createComplaint(@RequestBody CreateComplaintRequest request) {
-        return ResponseEntity.ok(reportService.createComplaint(request));
-    }
+  /** User tạo khiếu nại (Complaint) */
+  @PostMapping
+  @PreAuthorize("hasAuthority('COMPLAINT:CREATE')")
+  public ResponseEntity<ComplaintResponse> createComplaint(
+      @RequestBody CreateComplaintRequest request) {
+    return ResponseEntity.ok(reportService.createComplaint(request));
+  }
 
-    @PutMapping("{id}")
-    @PreAuthorize("hasAuthority('COMPLAINT:PROCESS')")
-    public ResponseEntity<ComplaintResponse> updateComplaint(
-            @PathVariable Long id,
-            @RequestParam ComplaintStatus status
-    ){
-        return ResponseEntity.ok(reportService.updateComplaint(id, status));
-    }
+  @PutMapping("{id}")
+  @PreAuthorize("hasAuthority('COMPLAINT:PROCESS')")
+  public ResponseEntity<ComplaintResponse> updateComplaint(
+      @PathVariable Long id, @RequestParam ComplaintStatus status) {
+    return ResponseEntity.ok(reportService.updateComplaint(id, status));
+  }
 
-    /**
-     * Lấy danh sách khiếu nại (Complaints)
-     * Hỗ trợ filter: status, username, reportId...
-     * Ví dụ: /api/v1/admin/complaints?filter=status=='PENDING';username=='khang'&page=0&size=10
-     */
-    @PreAuthorize("hasAuthority('COMPLAINT:VIEW_ALL')")
-    @GetMapping
-    public ResponseEntity<PageVO<ComplaintResponse>> getComplaints(
-            @RequestParam(required = false) String filter,
-            @ParameterObject Pageable pageable
-    ) {
-        return ResponseEntity.ok(reportService.getComplaints(filter, pageable));
-    }
+  /**
+   * Lấy danh sách khiếu nại (Complaints) Hỗ trợ filter: status, username, reportId... Ví dụ:
+   * /api/v1/admin/complaints?filter=status=='PENDING';username=='khang'&page=0&size=10
+   */
+  @PreAuthorize("hasAuthority('COMPLAINT:VIEW_ALL')")
+  @GetMapping
+  public ResponseEntity<PageVO<ComplaintResponse>> getComplaints(
+      @RequestParam(required = false) String filter, @ParameterObject Pageable pageable) {
+    return ResponseEntity.ok(reportService.getComplaints(filter, pageable));
+  }
 
-    /**
-     * Lấy chi tiết khiếu nại theo ID
-     */
-    @PreAuthorize("hasAuthority('COMPLAINT:VIEW_ALL')")
-    @GetMapping("{id}")
-    public ResponseEntity<ComplaintResponse> getComplaintById(@PathVariable Long id) {
-        return ResponseEntity.ok(reportService.getComplaintById(id));
-    }
+  /** Lấy chi tiết khiếu nại theo ID */
+  @PreAuthorize("hasAuthority('COMPLAINT:VIEW_ALL')")
+  @GetMapping("{id}")
+  public ResponseEntity<ComplaintResponse> getComplaintById(@PathVariable Long id) {
+    return ResponseEntity.ok(reportService.getComplaintById(id));
+  }
 }
