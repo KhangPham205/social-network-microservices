@@ -12,7 +12,6 @@ spring:
   swagger-ui:
     path: /swagger-ui.html
     server:
-      # Trỏ về domain/IP của Gateway thay vì localhost:8082
       url: http://localhost:8080
 
 eureka:

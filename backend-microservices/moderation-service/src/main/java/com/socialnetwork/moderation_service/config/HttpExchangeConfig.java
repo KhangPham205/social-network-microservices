@@ -1,8 +1,11 @@
 package com.socialnetwork.moderation_service.config;
 
+import com.socialnetwork.moderation_service.client.AuthClient;
 import com.socialnetwork.moderation_service.client.ChatClient;
-import com.socialnetwork.moderation_service.client.PostClient;
+import com.socialnetwork.moderation_service.client.MediaClient;
 import com.socialnetwork.moderation_service.client.UserClient;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -12,9 +15,12 @@ import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.support.RestClientAdapter;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 @Configuration
@@ -42,14 +48,38 @@ public class HttpExchangeConfig {
     HttpComponentsClientHttpRequestFactory factory =
         new HttpComponentsClientHttpRequestFactory(httpClient);
 
-    return RestClient.builder().requestFactory(factory);
+    return RestClient.builder()
+        .requestFactory(factory)
+        .requestInterceptor((request, body, execution) -> {
+          ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+          if (attributes != null) {
+            HttpServletRequest servletRequest = attributes.getRequest();
+            if (servletRequest.getCookies() != null) {
+              for (Cookie cookie : servletRequest.getCookies()) {
+                if ("jwt".equals(cookie.getName())) {
+                  request.getHeaders().add(HttpHeaders.COOKIE, "jwt=" + cookie.getValue());
+                  request.getHeaders().setBearerAuth(cookie.getValue());
+                  break;
+                }
+              }
+            }
+          }
+          return execution.execute(request, body);
+        });
   }
 
   @Bean
-  public PostClient postClient(@Qualifier("microserviceBuilder") RestClient.Builder builder) {
-    RestClient restClient = builder.baseUrl("http://post-service").build();
+  public AuthClient authClient(@Qualifier("microserviceBuilder") RestClient.Builder builder) {
+    RestClient restClient = builder.baseUrl("http://auth-service").build();
     RestClientAdapter adapter = RestClientAdapter.create(restClient);
-    return HttpServiceProxyFactory.builderFor(adapter).build().createClient(PostClient.class);
+    return HttpServiceProxyFactory.builderFor(adapter).build().createClient(AuthClient.class);
+  }
+
+  @Bean
+  public MediaClient mediaClient(@Qualifier("microserviceBuilder") RestClient.Builder builder) {
+    RestClient restClient = builder.baseUrl("http://media-service").build();
+    RestClientAdapter adapter = RestClientAdapter.create(restClient);
+    return HttpServiceProxyFactory.builderFor(adapter).build().createClient(MediaClient.class);
   }
 
   @Bean

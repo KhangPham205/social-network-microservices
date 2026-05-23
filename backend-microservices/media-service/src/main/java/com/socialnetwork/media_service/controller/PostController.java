@@ -82,4 +82,16 @@ public class PostController {
     postService.deletePost(postId);
     return ResponseEntity.noContent().build();
   }
+
+  // ================= API NỘI BỘ CHO MODERATION SERVICE =================
+
+  @GetMapping("/{postId}/owner-id")
+  public ResponseEntity<Long> getPostOwnerId(@PathVariable("postId") Long postId) {
+    return ResponseEntity.ok(postService.getPostOwnerId(postId));
+  }
+
+  @PostMapping("/batch")
+  public ResponseEntity<List<PostResponse>> getPostsByIds(@RequestBody List<Long> ids) {
+    return ResponseEntity.ok(postService.getPostsByIds(ids));
+  }
 }

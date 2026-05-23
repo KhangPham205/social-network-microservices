@@ -22,7 +22,11 @@ public interface ModerationService {
 
   PageVO<PostResponse> getFlaggedPosts(String filter, Pageable pageable);
 
+  PostResponse getPostDetailForAdmin(Long postId);
+
   PageVO<CommentResponse> getFlaggedComments(String filter, Pageable pageable);
+
+  CommentResponse getCommentDetailForAdmin(Long commentId);
 
   PageVO<ModerationMessageResponse> getFlaggedMessages(String filter, Pageable pageable);
 

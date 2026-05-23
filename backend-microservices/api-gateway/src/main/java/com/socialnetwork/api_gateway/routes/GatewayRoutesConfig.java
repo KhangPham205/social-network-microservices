@@ -69,6 +69,17 @@ public class GatewayRoutesConfig {
                     .filters(f -> f.setPath("/swagger-ui"))
                     .uri("lb://chat-service"))
         .route("chat-service-ws", r -> r.path("/ws/chat/**").uri("lb:ws://chat-service"))
+        .route(
+            "moderation-service",
+            r ->
+                r.path("/api/v1/moderation/**", "/api/v1/reports/**", "/api/v1/complaints/**")
+                    .uri("lb://moderation-service"))
+        .route(
+            "moderation-service-swagger",
+            r ->
+                r.path("/aggregate/moderation-service/v3/api-docs/**")
+                    .filters(f -> f.setPath("/v3/api-docs"))
+                    .uri("lb://moderation-service"))
         .build();
   }
 }

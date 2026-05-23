@@ -37,4 +37,5 @@ public class CommentResponse {
   private Integer depth;
 
   private Instant deletedAt;
+  private Boolean isSystemBan;
 }

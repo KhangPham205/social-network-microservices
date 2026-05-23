@@ -145,6 +145,18 @@ public class PostServiceImpl implements PostService {
   }
 
   @Override
+  @Transactional
+  public void updateSystemBanStatus(Long postId, boolean isBanned) {
+    Post post = postRepository.findById(postId)
+        .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+
+    post.setDeletedAt(isBanned ? Instant.now() : null);
+    post.setIsSystemBan(isBanned);
+    postRepository.save(post);
+    log.info("Đã cập nhật SystemBan = {} cho Post ID: {}", isBanned, postId);
+  }
+
+  @Override
   @Transactional(readOnly = true)
   @Cacheable(value = "post_details", key = "#postId")
   public PostResponse getPostById(Long postId) {
@@ -164,18 +176,18 @@ public class PostServiceImpl implements PostService {
   public PageVO<PostResponse> getFeed(Pageable pageable, String filter) {
     Long currentUserId = getCurrentUserId();
 
-    // 1. Gọi HTTP sang user-service để lấy danh sách ID (Bạn bè + Đang Follow)
     List<Long> networkIds = new ArrayList<>(userServiceClient.getNetworkIds(currentUserId));
     if (!networkIds.contains(currentUserId)) {
-      networkIds.add(currentUserId); // Luôn xem được bài của chính mình
+      networkIds.add(currentUserId);
     }
 
-    // 2. Build Query động (Specification)
     Specification<Post> spec =
         (root, query, cb) -> {
           Predicate authorInNetwork = root.get("author").get("id").in(networkIds);
-          Predicate notDeleted = cb.isNull(root.get("deletedAt"));
           Predicate notBanned = cb.isFalse(root.get("isSystemBan"));
+          Predicate notDeleted = cb.isNull(root.get("deletedAt"));
+          Predicate isMyPost = cb.equal(root.get("author").get("id"), currentUserId);
+          Predicate visibilityCondition = cb.or(notBanned, notDeleted, isMyPost);
 
           // Logic quyền xem:
           Predicate isPublic = cb.equal(root.get("accessModifier"), AccessScope.PUBLIC);
@@ -192,7 +204,7 @@ public class PostServiceImpl implements PostService {
                   cb.equal(root.get("author").get("id"), currentUserId));
 
           Predicate accessControl = cb.or(isPublic, isFriendScope, isPrivateAndMine);
-          Predicate finalPredicate = cb.and(authorInNetwork, notDeleted, notBanned, accessControl);
+          Predicate finalPredicate = cb.and(authorInNetwork, visibilityCondition, accessControl);
 
           // Filter theo keyword nếu có
           if (filter != null && !filter.isBlank()) {
@@ -223,7 +235,7 @@ public class PostServiceImpl implements PostService {
           Predicate notDeleted = cb.isNull(root.get("deletedAt"));
           Predicate notBanned = cb.isFalse(root.get("isSystemBan"));
 
-          if (isSelf) return cb.and(authorMatch, notDeleted, notBanned); // Xem full bài của mình
+          if (isSelf) return cb.and(authorMatch);
 
           Predicate publicPosts = cb.equal(root.get("accessModifier"), AccessScope.PUBLIC);
           if (isFriend) {
@@ -297,11 +309,22 @@ public class PostServiceImpl implements PostService {
       throw new AccessDeniedException("You are not authorized to delete this post.");
     }
 
-    // Soft Delete (Thay vì xóa vật lý, set deletedAt để giữ lịch sử)
-    post.setDeletedAt(Instant.now());
-    postRepository.save(post);
+    postRepository.deleteById(post.getId());
 
     // Optional: Bắn event ra Kafka để các service khác biết bài này đã bị xóa
+  }
+
+  @Override
+  public Long getPostOwnerId(Long postId) {
+    Post post = postRepository.findById(postId)
+        .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+    return post.getAuthor().getId();
+  }
+
+  @Override
+  public List<PostResponse> getPostsByIds(List<Long> ids) {
+    List<Post> posts = postRepository.findAllById(ids);
+    return posts.stream().map(postMapper::toDto).toList();
   }
 
   // ==========================================
@@ -325,6 +348,10 @@ public class PostServiceImpl implements PostService {
 
     if (post.getAccessModifier() == AccessScope.PRIVATE) {
       throw new AccessDeniedException("This post is private.");
+    }
+
+    if (post.getDeletedAt() != null && !authorId.equals(viewerId)) {
+      throw new ResourceNotFoundException("Post not found or has been deleted.");
     }
 
     if (post.getAccessModifier() == AccessScope.FRIENDS) {

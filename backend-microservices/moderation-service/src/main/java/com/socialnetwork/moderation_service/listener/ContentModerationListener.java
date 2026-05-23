@@ -1,4 +1,4 @@
-package com.socialnetwork.moderation_service.service;
+package com.socialnetwork.moderation_service.listener;
 
 import com.socialnetwork.moderation_service.enums.ReportReason;
 import com.socialnetwork.moderation_service.enums.ReportStatus;
@@ -8,6 +8,7 @@ import com.socialnetwork.moderation_service.model.ModerationLog;
 import com.socialnetwork.moderation_service.model.Report;
 import com.socialnetwork.moderation_service.repository.ModerationLogRepository;
 import com.socialnetwork.moderation_service.repository.ReportRepository;
+import com.socialnetwork.moderation_service.service.ModerationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +19,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import vo.TargetType;
 
 /**
@@ -33,7 +33,6 @@ public class ContentModerationListener {
   private final ModerationLogRepository moderationLogRepository;
   private final ReportRepository reportRepository;
   private final ModerationService moderationService;
-  private final RestTemplate restTemplate;
 
   /** Handle content creation events via Kafka */
   @Async

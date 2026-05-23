@@ -54,4 +54,7 @@ public class Comment {
   @UpdateTimestamp private Instant updatedAt;
 
   private Instant deletedAt;
+
+  @Column(name = "is_system_ban")
+  private Boolean isSystemBan;
 }

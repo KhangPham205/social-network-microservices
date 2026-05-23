@@ -1,6 +1,10 @@
 package com.socialnetwork.auth_service.repository;
 
+import com.netflix.appinfo.ApplicationInfoManager;
 import com.socialnetwork.auth_service.model.UserCredential;
+
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -13,4 +17,8 @@ public interface UserCredentialRepository extends JpaRepository<UserCredential, 
   Optional<UserCredential> findByEmail(String email);
 
   boolean existsByUsername(String username);
+
+  Optional<UserCredential> getUserCredentialById(Long id);
+
+  List<UserCredential> findByIdIn(List<Long> ids);
 }

@@ -22,6 +22,7 @@ import exception.ResourceNotFoundException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -210,6 +211,46 @@ public class AuthServiceImpl implements AuthService {
     userCredentialRepository.save(userCredential);
 
     return new RegisterResponse("Staff account created successfully");
+  }
+
+  @Override
+  public AuthCredentialDto getCredentialById(Long id) {
+    return userCredentialRepository.getUserCredentialById(id)
+        .map(
+            user -> {
+              Set<String> roleNames =
+                  user.getRoles().stream()
+                      .map(Role::getName)
+                      .collect(Collectors.toSet());
+
+              return AuthCredentialDto.builder()
+                  .id(user.getId())
+                  .username(user.getUsername())
+                  .email(user.getEmail())
+                  .status(user.getStatus())
+                  .build();
+            })
+        .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+  }
+
+  @Override
+  public List<AuthCredentialDto> getCredentialsByIds(List<Long> ids) {
+    return userCredentialRepository.findByIdIn(ids).stream()
+        .map(
+            user -> {
+              Set<String> roleNames =
+                  user.getRoles().stream()
+                      .map(Role::getName)
+                      .collect(Collectors.toSet());
+
+              return AuthCredentialDto.builder()
+                  .id(user.getId())
+                  .username(user.getUsername())
+                  .email(user.getEmail())
+                  .status(user.getStatus())
+                  .build();
+            })
+        .collect(Collectors.toList());
   }
 
   // --------------------- Helper methods --------------------------

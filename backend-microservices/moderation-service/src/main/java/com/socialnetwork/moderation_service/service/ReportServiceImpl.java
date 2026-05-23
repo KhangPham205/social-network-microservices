@@ -1,9 +1,12 @@
 package com.socialnetwork.moderation_service.service;
 
 import com.socialnetwork.moderation_service.client.ChatClient;
-import com.socialnetwork.moderation_service.client.PostClient;
+import com.socialnetwork.moderation_service.client.MediaClient;
+import com.socialnetwork.moderation_service.client.UserClient;
 import com.socialnetwork.moderation_service.dto.*;
+import com.socialnetwork.moderation_service.dto.external.UserExternalDto;
 import com.socialnetwork.moderation_service.enums.ComplaintStatus;
+import com.socialnetwork.moderation_service.enums.ReportStatus;
 import com.socialnetwork.moderation_service.mapper.ReportMapper;
 import com.socialnetwork.moderation_service.model.Complaint;
 import com.socialnetwork.moderation_service.model.Report;
@@ -12,9 +15,10 @@ import com.socialnetwork.moderation_service.repository.ReportRepository;
 import exception.BadRequestException;
 import exception.ResourceNotFoundException;
 import io.github.perplexhub.rsql.RSQLJPASupport;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -35,27 +39,23 @@ public class ReportServiceImpl implements ReportService {
   private final ComplaintRepository complaintRepository;
   private final ReportMapper reportMapper;
 
-  private final PostClient postClient;
+  private final UserClient userClient;
+  private final MediaClient mediaClient;
   private final ChatClient chatClient;
 
   @Override
   @Transactional
   public ReportResponse createReport(Long reporterId, CreateReportRequest request) {
-    // Check if reporter has already reported this content
     if (reportRepository.existsByReporterIdAndTargetTypeAndTargetId(
         reporterId, request.getTargetType(), request.getTargetId())) {
-      throw new BadRequestException("Bạn đã báo cáo nội dung này rồi.");
+      throw new BadRequestException("You have already reported this content.");
     }
 
-    // Determine target owner ID
     Long targetOwnerId = determineTargetOwnerId(request.getTargetType(), request.getTargetId());
-
     if (targetOwnerId == null) {
-      throw new BadRequestException(
-          "Không xác định được chủ sở hữu nội dung (Nội dung có thể đã bị xóa)");
+      throw new BadRequestException("Unable to determine content owner. Please try again later.");
     }
 
-    // Create Report without User entity dependency
     Report report =
         Report.builder()
             .reporterId(reporterId)
@@ -63,8 +63,9 @@ public class ReportServiceImpl implements ReportService {
             .targetId(request.getTargetId())
             .targetUserId(targetOwnerId)
             .reason(request.getReason())
-            .customReason(
-                request.getReason().name().equals("OTHER") ? request.getCustomReason() : null)
+            .customReason(request.getReason().name().equals("OTHER") ? request.getCustomReason() : null)
+            .status(ReportStatus.PENDING)
+            .isBannedBySystem(false)
             .build();
 
     return reportMapper.toResponse(reportRepository.save(report));
@@ -74,8 +75,8 @@ public class ReportServiceImpl implements ReportService {
   private Long determineTargetOwnerId(TargetType targetType, String targetId) {
     try {
       return switch (targetType) {
-        case POST -> postClient.getPostOwnerId(targetId);
-        case COMMENT -> postClient.getCommentOwnerId(targetId);
+        case POST -> mediaClient.getPostOwnerId(targetId);
+        case COMMENT -> mediaClient.getCommentOwnerId(targetId);
         case USER -> Long.valueOf(targetId);
         case MESSAGE -> chatClient.getMessageOwnerId(targetId);
         default -> null;
@@ -194,11 +195,41 @@ public class ReportServiceImpl implements ReportService {
   @Transactional(readOnly = true)
   public PageVO<ReportResponse> getReportsByContent(
       String targetId, TargetType targetType, Pageable pageable) {
-    Page<Report> page =
-        reportRepository.findByTargetTypeAndTargetId(targetType, targetId, pageable);
 
-    List<ReportResponse> content =
-        page.getContent().stream().map(reportMapper::toResponse).toList();
+    Page<Report> page = reportRepository.findByTargetTypeAndTargetId(targetType, targetId, pageable);
+    if (page.isEmpty()) return buildEmptyPageVO(page);
+
+    List<Long> reporterIds = page.getContent().stream()
+        .map(Report::getReporterId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+
+    Map<Long, UserExternalDto> userMap = new HashMap<>();
+    if (!reporterIds.isEmpty()) {
+      try {
+        List<UserExternalDto> users = userClient.getUsersByIds(reporterIds);
+        userMap = users.stream().collect(Collectors.toMap(UserExternalDto::getId, u -> u));
+      } catch (Exception e) {
+        log.warn("Unable to get the information: {}", e.getMessage());
+      }
+    }
+
+    Map<Long, UserExternalDto> finalUserMap = userMap;
+    List<ReportResponse> content = page.getContent().stream().map(report -> {
+      ReportResponse response = reportMapper.toResponse(report);
+
+      if (report.getReporterId() != null && finalUserMap.containsKey(report.getReporterId())) {
+        UserExternalDto user = finalUserMap.get(report.getReporterId());
+        response.setReporterName(user.getDisplayName());
+        response.setReporterAvatar(user.getAvatarUrl());
+      }
+
+      if (response.getStatus() == null) response.setStatus(ReportStatus.PENDING);
+      if (response.getIsBannedBySystem() == null) response.setIsBannedBySystem(false);
+
+      return response;
+    }).toList();
 
     return PageVO.<ReportResponse>builder()
         .page(page.getNumber())
@@ -214,11 +245,39 @@ public class ReportServiceImpl implements ReportService {
   @Transactional(readOnly = true)
   public PageVO<ComplaintResponse> getComplaintsByContent(
       String targetId, TargetType targetType, Pageable pageable) {
-    Page<Complaint> page =
-        complaintRepository.findByTargetTypeAndTargetId(targetType, targetId, pageable);
 
-    List<ComplaintResponse> content =
-        page.getContent().stream().map(reportMapper::toResponse).toList();
+    Page<Complaint> page = complaintRepository.findByTargetTypeAndTargetId(targetType, targetId, pageable);
+    if (page.isEmpty()) return buildEmptyPageVO(page);
+
+    List<Long> userIds = page.getContent().stream()
+        .map(Complaint::getUserId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+
+    Map<Long, UserExternalDto> userMap = new HashMap<>();
+    if (!userIds.isEmpty()) {
+      try {
+        List<UserExternalDto> users = userClient.getUsersByIds(userIds);
+        userMap = users.stream().collect(Collectors.toMap(UserExternalDto::getId, u -> u));
+      } catch (Exception e) {
+        log.warn("Unable to get the information {}", e.getMessage());
+      }
+    }
+
+    Map<Long, UserExternalDto> finalUserMap = userMap;
+    List<ComplaintResponse> content = page.getContent().stream().map(complaint -> {
+      ComplaintResponse response = reportMapper.toResponse(complaint);
+
+      if (complaint.getUserId() != null && finalUserMap.containsKey(complaint.getUserId())) {
+        UserExternalDto user = finalUserMap.get(complaint.getUserId());
+        response.setUserDisplayName(user.getDisplayName());
+      }
+
+      if (response.getStatus() == null) response.setStatus(ComplaintStatus.PENDING);
+
+      return response;
+    }).toList();
 
     return PageVO.<ComplaintResponse>builder()
         .page(page.getNumber())
@@ -275,8 +334,8 @@ public class ReportServiceImpl implements ReportService {
     try {
       Long ownerId =
           switch (type) {
-            case POST -> postClient.getPostOwnerId(targetId);
-            case COMMENT -> postClient.getCommentOwnerId(targetId);
+            case POST -> mediaClient.getPostOwnerId(targetId);
+            case COMMENT -> mediaClient.getCommentOwnerId(targetId);
             case USER -> Long.valueOf(targetId);
             case MESSAGE -> chatClient.getMessageOwnerId(targetId);
             default -> throw new BadRequestException("Loại nội dung không hỗ trợ khiếu nại.");
@@ -291,5 +350,16 @@ public class ReportServiceImpl implements ReportService {
     } catch (Exception e) {
       log.warn("Không thể gọi service để verify ownership lúc này: {}", e.getMessage());
     }
+  }
+
+  private <T> PageVO<T> buildEmptyPageVO(Page<?> page) {
+    return PageVO.<T>builder()
+        .page(page.getNumber())
+        .size(page.getSize())
+        .totalElements(page.getTotalElements())
+        .totalPages(page.getTotalPages())
+        .numberOfElements(0)
+        .content(Collections.emptyList())
+        .build();
   }
 }

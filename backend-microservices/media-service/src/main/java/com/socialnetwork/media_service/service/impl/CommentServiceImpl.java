@@ -19,6 +19,8 @@ import com.socialnetwork.media_service.service.ReactService;
 import com.socialnetwork.media_service.service.StorageService;
 import exception.AccessDeniedException;
 import exception.ResourceNotFoundException;
+
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -158,6 +160,18 @@ public class CommentServiceImpl implements CommentService {
   }
 
   @Override
+  @Transactional
+  public void updateSystemBanStatus(Long commentId, boolean isBanned) {
+    Comment comment = commentRepository.findById(commentId)
+        .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+    comment.setDeletedAt(isBanned ? Instant.now() : null);
+    comment.setIsSystemBan(isBanned);
+    commentRepository.save(comment);
+    log.info("Đã cập nhật SystemBan = {} cho Comment ID: {}", isBanned, commentId);
+  }
+
+  @Override
   public CommentResponse getCommentById(Long id) {
     return null;
   }
@@ -178,6 +192,20 @@ public class CommentServiceImpl implements CommentService {
     commentRepository.delete(comment);
     // Giảm count của bài Post
     postRepository.updateCommentCount(comment.getPost().getId(), -1);
+  }
+
+  @Override
+  public Long getCommentOwnerId(Long commentId) {
+    Comment comment = commentRepository.findById(commentId)
+        .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+    return comment.getAuthor().getId();
+  }
+
+  @Override
+  public List<CommentResponse> getCommentsByIds(List<Long> ids) {
+    List<Comment> comments = commentRepository.findAllById(ids);
+    // Dùng mapper chuyển sang DTO
+    return comments.stream().map(commentMapper::toDto).toList();
   }
 
   @Override

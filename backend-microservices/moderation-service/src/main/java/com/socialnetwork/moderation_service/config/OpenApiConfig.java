@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
   @Bean
-  public OpenAPI mediaServiceOpenAPI() {
+  public OpenAPI moderationServiceOpenAPI() {
     // Tên của scheme bảo mật (dùng nội bộ trong code)
     String securitySchemeName = "bearerAuth";
 

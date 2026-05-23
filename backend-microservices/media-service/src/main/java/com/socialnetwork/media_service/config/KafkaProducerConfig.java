@@ -27,7 +27,7 @@ public class KafkaProducerConfig {
     props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JacksonJsonSerializer.class);
     props.put(
         JacksonJsonDeserializer.TYPE_MAPPINGS,
-        "contentCreated:com.socialnetwork.moderation_service.event.ContentCreatedEvent");
+        "contentCreated:com.socialnetwork.media_service.events.ContentCreatedEvent");
 
     return new DefaultKafkaProducerFactory<>(props);
   }

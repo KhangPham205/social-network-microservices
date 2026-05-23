@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import vo.PageVO;
 
 @RestController
-@RequestMapping("/api/v1/reports")
+@RequestMapping("/api/v1/moderation/reports")
 @RequiredArgsConstructor
 public class ReportController {
 
@@ -37,7 +37,7 @@ public class ReportController {
 
   @GetMapping("/{reportId}")
   @PreAuthorize("hasAuthority('REPORT:VIEW_ALL')")
-  public ResponseEntity<ReportResponse> getReportById(@PathVariable Long reportId) {
+  public ResponseEntity<ReportResponse> getReportById(@PathVariable("reportId") Long reportId) {
     return ResponseEntity.ok(reportService.getReportById(reportId));
   }
 

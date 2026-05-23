@@ -14,6 +14,8 @@ public interface PostService {
 
   PostResponse update(UpdatePostRequest request);
 
+  void updateSystemBanStatus(Long postId, boolean isBanned);
+
   PostResponse getPostById(Long postId);
 
   PageVO<PostResponse> getMyPosts(Pageable pageable);
@@ -26,4 +28,7 @@ public interface PostService {
 
   @Transactional
   void deletePost(Long postId);
+
+  Long getPostOwnerId(Long postId);
+  List<PostResponse> getPostsByIds(List<Long> ids);
 }

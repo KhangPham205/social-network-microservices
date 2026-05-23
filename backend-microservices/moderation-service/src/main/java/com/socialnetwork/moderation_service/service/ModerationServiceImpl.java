@@ -1,14 +1,12 @@
 package com.socialnetwork.moderation_service.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.socialnetwork.moderation_service.client.AuthClient;
 import com.socialnetwork.moderation_service.client.ChatClient;
-import com.socialnetwork.moderation_service.client.PostClient;
+import com.socialnetwork.moderation_service.client.MediaClient;
 import com.socialnetwork.moderation_service.client.UserClient;
 import com.socialnetwork.moderation_service.dto.*;
-import com.socialnetwork.moderation_service.dto.external.CommentResponse;
-import com.socialnetwork.moderation_service.dto.external.PostExternalDto;
-import com.socialnetwork.moderation_service.dto.external.PostResponse;
-import com.socialnetwork.moderation_service.dto.external.UserExternalDto;
+import com.socialnetwork.moderation_service.dto.external.*;
 import com.socialnetwork.moderation_service.enums.AccountStatus;
 import com.socialnetwork.moderation_service.enums.ReportReason;
 import com.socialnetwork.moderation_service.enums.ReportStatus;
@@ -48,8 +46,9 @@ public class ModerationServiceImpl implements ModerationService {
 
   private final ObjectMapper objectMapper;
   private final UserClient userClient;
-  private final PostClient postClient;
+  private final MediaClient mediaClient;
   private final ChatClient chatClient;
+  private final AuthClient authClient;
   private final ReportRepository reportRepository;
   private final ComplaintRepository complaintRepository;
   private final ReportMapper reportMapper;
@@ -70,21 +69,24 @@ public class ModerationServiceImpl implements ModerationService {
 
   @Override
   public ModerationUserDetailResponse getUserDetailForAdmin(Long userId) {
-    UserExternalDto user = userClient.getUserDetail(userId);
-    if (user == null) throw new ResourceNotFoundException("User not found");
+    UserExternalDto userProfile = userClient.getUserDetail(userId);
+    if (userProfile == null) throw new ResourceNotFoundException("User profile not found");
+
+    AuthExternalDto authInfo = authClient.getCredential(userId);
+    if (authInfo == null) throw new ResourceNotFoundException("User credential not found");
 
     long totalReports = reportRepository.countByTargetUserId(userId);
 
     return ModerationUserDetailResponse.builder()
-        .id(user.getId())
-        .displayName(user.getDisplayName())
-        .avatarUrl(user.getAvatarUrl())
-        .email(user.getEmail())
-        .status(AccountStatus.valueOf(user.getStatus()))
-        .bio(user.getBio())
+        .id(userProfile.getId())
+        .displayName(userProfile.getDisplayName())
+        .avatarUrl(userProfile.getAvatarUrl())
+        .email(authInfo.getEmail())
+        .status(AccountStatus.valueOf(authInfo.getStatus()))
+        .bio(userProfile.getBio())
         .violationCount(totalReports)
-        .createdAt(user.getCreatedAt())
-        .lastActiveAt(user.getLastActiveAt())
+        .createdAt(userProfile.getCreatedAt())
+        .lastActiveAt(userProfile.getLastActiveAt())
         .build();
   }
 
@@ -124,40 +126,36 @@ public class ModerationServiceImpl implements ModerationService {
 
   @Override
   public PageVO<UserModerationResponse> getUsersWithReportCount(Pageable pageable, String filter) {
-    // BƯỚC 1: Tìm ID Users bị report nhiều nhất từ DB nội bộ
     Page<IdCount> reportedUsersPage = reportRepository.findTopReportedUsers(pageable);
     if (reportedUsersPage.isEmpty()) return buildEmptyPageVO(reportedUsersPage);
 
-    // BƯỚC 2: Gọi HTTP sang User Service lấy Data
-    List<Long> userIds =
-        reportedUsersPage.getContent().stream()
-            .map(idCount -> Long.valueOf(String.valueOf(idCount.getId())))
-            .toList();
-    List<UserExternalDto> externalUsers = userClient.getUsersByIds(userIds);
+    List<Long> userIds = reportedUsersPage.getContent().stream()
+        .map(idCount -> Long.valueOf(String.valueOf(idCount.getId()))).toList();
 
-    Map<Long, UserExternalDto> userMap =
-        externalUsers.stream().collect(Collectors.toMap(UserExternalDto::getId, u -> u));
+    List<UserExternalDto> userProfiles = userClient.getUsersByIds(userIds);
+    List<AuthExternalDto> authInfos = authClient.getCredentialsByIds(userIds);
 
-    // BƯỚC 3: Map Data
-    List<UserModerationResponse> content =
-        reportedUsersPage.getContent().stream()
-            .map(
-                idCount -> {
-                  Long uid = Long.valueOf(String.valueOf(idCount.getId()));
-                  UserExternalDto uInfo = userMap.get(uid);
-                  if (uInfo == null) return null;
+    Map<Long, UserExternalDto> profileMap = userProfiles.stream().collect(Collectors.toMap(UserExternalDto::getId, u -> u));
+    Map<Long, AuthExternalDto> authMap = authInfos.stream().collect(Collectors.toMap(AuthExternalDto::getId, a -> a));
 
-                  return new UserModerationResponse(
-                      uInfo.getId(),
-                      uInfo.getUsername(),
-                      uInfo.getEmail(),
-                      uInfo.getDisplayName(),
-                      uInfo.getAvatarUrl(),
-                      uInfo.getStatus(),
-                      idCount.getCount());
-                })
-            .filter(Objects::nonNull)
-            .toList();
+    List<UserModerationResponse> content = reportedUsersPage.getContent().stream().map(idCount -> {
+      Long uid = Long.valueOf(String.valueOf(idCount.getId()));
+
+      UserExternalDto profile = profileMap.get(uid);
+      AuthExternalDto auth = authMap.get(uid);
+
+      if (profile == null || auth == null) return null;
+
+      return new UserModerationResponse(
+          uid,
+          auth.getUsername(),      // Từ Auth
+          auth.getEmail(),         // Từ Auth
+          profile.getDisplayName(),// Từ User
+          profile.getAvatarUrl(),  // Từ User
+          auth.getStatus(),        // Từ Auth
+          idCount.getCount()
+      );
+    }).filter(Objects::nonNull).toList();
 
     return buildPageVO(reportedUsersPage, content);
   }
@@ -170,7 +168,7 @@ public class ModerationServiceImpl implements ModerationService {
     List<Long> postIds =
         flagged.getContent().stream().map(i -> Long.valueOf(String.valueOf(i.getId()))).toList();
 
-    List<PostResponse> posts = postClient.getPostsByIds(postIds);
+    List<PostResponse> posts = mediaClient.getPostsByIds(postIds);
 
     enrichWithCounts(
         posts,
@@ -182,6 +180,21 @@ public class ModerationServiceImpl implements ModerationService {
   }
 
   @Override
+  public PostResponse getPostDetailForAdmin(Long postId) {
+    List<PostResponse> posts = mediaClient.getPostsByIds(List.of(postId));
+
+    if (posts == null || posts.isEmpty()) {
+      throw new ResourceNotFoundException("The post does not exist or has been deleted");
+    }
+
+    PostResponse post = posts.get(0);
+
+    enrichWithCounts(List.of(post), PostResponse::getId, PostResponse::setReportCount, PostResponse::setComplaintCount, TargetType.POST);
+
+    return post;
+  }
+
+  @Override
   public PageVO<CommentResponse> getFlaggedComments(String filter, Pageable pageable) {
     Page<IdCount> flagged = reportRepository.findTopReportedTargets(TargetType.COMMENT, pageable);
     if (flagged.isEmpty()) return buildEmptyPageVO(flagged);
@@ -189,7 +202,7 @@ public class ModerationServiceImpl implements ModerationService {
     List<Long> commentIds =
         flagged.getContent().stream().map(i -> Long.valueOf(String.valueOf(i.getId()))).toList();
 
-    List<CommentResponse> comments = postClient.getCommentsByIds(commentIds);
+    List<CommentResponse> comments = mediaClient.getCommentsByIds(commentIds);
 
     enrichWithCounts(
         comments,
@@ -198,6 +211,22 @@ public class ModerationServiceImpl implements ModerationService {
         CommentResponse::setComplaintCount,
         TargetType.COMMENT);
     return buildPageVO(flagged, comments);
+  }
+
+  @Override
+  public CommentResponse getCommentDetailForAdmin(Long commentId) {
+    // Tận dụng hàm Batch để lấy 1 bình luận
+    List<CommentResponse> comments = mediaClient.getCommentsByIds(List.of(commentId));
+
+    if (comments == null || comments.isEmpty()) {
+      throw new ResourceNotFoundException("The comment does not exist or has been deleted");
+    }
+
+    CommentResponse comment = comments.get(0);
+
+    enrichWithCounts(List.of(comment), CommentResponse::getId, CommentResponse::setReportCount, CommentResponse::setComplaintCount, TargetType.COMMENT);
+
+    return comment;
   }
 
   @Override

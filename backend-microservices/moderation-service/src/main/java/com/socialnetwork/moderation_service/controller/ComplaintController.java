@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import vo.PageVO;
 
 @RestController
-@RequestMapping("/api/v1/complaints")
+@RequestMapping("/api/v1/moderation/complaints")
 @RequiredArgsConstructor
 public class ComplaintController {
 
@@ -29,7 +29,7 @@ public class ComplaintController {
   @PutMapping("{id}")
   @PreAuthorize("hasAuthority('COMPLAINT:PROCESS')")
   public ResponseEntity<ComplaintResponse> updateComplaint(
-      @PathVariable Long id, @RequestParam ComplaintStatus status) {
+      @PathVariable("id") Long id, @RequestParam ComplaintStatus status) {
     return ResponseEntity.ok(reportService.updateComplaint(id, status));
   }
 
@@ -47,7 +47,7 @@ public class ComplaintController {
   /** Lấy chi tiết khiếu nại theo ID */
   @PreAuthorize("hasAuthority('COMPLAINT:VIEW_ALL')")
   @GetMapping("{id}")
-  public ResponseEntity<ComplaintResponse> getComplaintById(@PathVariable Long id) {
+  public ResponseEntity<ComplaintResponse> getComplaintById(@PathVariable("id") Long id) {
     return ResponseEntity.ok(reportService.getComplaintById(id));
   }
 }

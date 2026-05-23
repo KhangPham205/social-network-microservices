@@ -1,11 +1,13 @@
 package com.socialnetwork.user_service.controller;
 
+import com.socialnetwork.user_service.dto.UserModerationDto;
 import com.socialnetwork.user_service.dto.UserProfileDto;
 import com.socialnetwork.user_service.service.FriendshipService;
 import com.socialnetwork.user_service.service.UserService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -44,5 +46,17 @@ public class InternalUserController {
       @RequestParam("user1") Long user1, @RequestParam("user2") Long user2) {
     boolean isFriend = friendshipService.isFriend(user1, user2);
     return ResponseEntity.ok(isFriend);
+  }
+
+  // ================= API NỘI BỘ CHO MODERATION SERVICE =================
+
+  @GetMapping("/{id}/admin-detail")
+  public ResponseEntity<UserModerationDto> getUserDetailForAdmin(@PathVariable("id") Long id) {
+    return ResponseEntity.ok(userService.getUserForModeration(id));
+  }
+
+  @PostMapping("/batch")
+  public ResponseEntity<List<UserModerationDto>> getUsersByIds(@RequestBody List<Long> ids) {
+    return ResponseEntity.ok(userService.getUsersByIds(ids));
   }
 }

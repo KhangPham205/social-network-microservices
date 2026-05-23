@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vo.PageVO;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/media/comments")
 @RequiredArgsConstructor
@@ -46,5 +48,17 @@ public class CommentController {
   public ResponseEntity<Void> deleteComment(@PathVariable("commentId") Long commentId) {
     commentService.deleteComment(commentId);
     return ResponseEntity.noContent().build();
+  }
+
+  // ================= API NỘI BỘ CHO MODERATION SERVICE =================
+
+  @GetMapping("/{commentId}/owner-id")
+  public ResponseEntity<Long> getCommentOwnerId(@PathVariable("commentId") Long commentId) {
+    return ResponseEntity.ok(commentService.getCommentOwnerId(commentId));
+  }
+
+  @PostMapping("/batch")
+  public ResponseEntity<List<CommentResponse>> getCommentsByIds(@RequestBody List<Long> ids) {
+    return ResponseEntity.ok(commentService.getCommentsByIds(ids));
   }
 }

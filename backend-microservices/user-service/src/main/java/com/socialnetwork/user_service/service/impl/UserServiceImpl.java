@@ -335,7 +335,32 @@ public class UserServiceImpl implements UserService {
     return mapToRelationDto(current, target);
   }
 
-  /** Hàm map tạm thời khi chưa có module Friendship/Follow */
+  @Override
+  public UserModerationDto getUserForModeration(Long userId) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    return mapToModerationDto(user);
+  }
+
+  @Override
+  public List<UserModerationDto> getUsersByIds(List<Long> ids) {
+    List<User> users = userRepository.findAllById(ids);
+    return users.stream().map(this::mapToModerationDto).toList();
+  }
+
+  /** Hàm map {@code User} sang {@code UserModerationDto} */
+  private UserModerationDto mapToModerationDto(User user) {
+    return UserModerationDto.builder()
+        .id(user.getId())
+        .displayName(user.getDisplayName())
+        .avatarUrl(user.getAvatarUrl())
+        .bio(user.getUserInfo() != null ? user.getUserInfo().getBio() : null)
+        .createdAt(user.getCreatedAt())
+        .lastActiveAt(user.getLastActiveAt())
+        .build();
+  }
+
+  /** Hàm map danh sách người dùng sang danh sách DTO quan hệ */
   private Map<Long, UserRelationDto> mapPageToRelationDtos(Long viewerId, List<User> targets) {
     if (targets.isEmpty()) {
       return java.util.Collections.emptyMap();

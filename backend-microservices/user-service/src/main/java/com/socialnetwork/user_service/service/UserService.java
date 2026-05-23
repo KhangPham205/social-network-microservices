@@ -1,12 +1,11 @@
 package com.socialnetwork.user_service.service;
 
-import com.socialnetwork.user_service.dto.FollowResponse;
-import com.socialnetwork.user_service.dto.UpdateProfileRequest;
-import com.socialnetwork.user_service.dto.UserProfileDto;
-import com.socialnetwork.user_service.dto.UserRelationDto;
+import com.socialnetwork.user_service.dto.*;
 import com.socialnetwork.user_service.model.User;
 import org.springframework.data.domain.Pageable;
 import vo.PageVO;
+
+import java.util.List;
 
 public interface UserService {
   // Hàm dành cho Auth Service gọi nội bộ khi có user đăng ký mới
@@ -31,4 +30,8 @@ public interface UserService {
   User getCurrentUser();
 
   UserRelationDto getRelationWithUser(Long id);
+
+  UserModerationDto getUserForModeration(Long id);
+
+  List<UserModerationDto> getUsersByIds(List<Long> ids);
 }

@@ -5,8 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -47,44 +46,4 @@ public interface PostRepository extends JpaRepository<Post, Long>, JpaSpecificat
   @Query(value = "SELECT * FROM posts WHERE id = :id", nativeQuery = true)
   Optional<Post> findByIdIncludingDeleted(@Param("id") Long id);
 
-  @Query(
-      value =
-          """
-        SELECT DISTINCT p.* FROM posts p
-        LEFT JOIN reports r ON (r.target_id = CAST(p.id AS VARCHAR) AND r.target_type = 'POST')
-        WHERE (p.deleted_at IS NOT NULL OR p.is_system_ban = true OR r.id IS NOT NULL)
-        AND (:filter IS NULL OR p.content ILIKE %:filter%)
-        """,
-      countQuery =
-          """
-        SELECT count(DISTINCT p.id) FROM posts p
-        LEFT JOIN reports r ON (r.target_id = CAST(p.id AS VARCHAR) AND r.target_type = 'POST')
-        WHERE (p.deleted_at IS NOT NULL OR p.system_ban = true OR r.id IS NOT NULL)
-        AND (:filter IS NULL OR p.content ILIKE %:filter%)
-        """,
-      nativeQuery = true)
-  Page<Post> findAllFlaggedPosts(@Param("filter") String filter, Pageable pageable);
-
-  @Query(
-      value =
-          """
-        SELECT CAST(EXTRACT(MONTH FROM created_at) AS INTEGER) as time_unit, COUNT(*)
-        FROM users
-        WHERE EXTRACT(YEAR FROM created_at) = :year
-        GROUP BY time_unit
-    """,
-      nativeQuery = true)
-  List<Object[]> countByYear(@Param("year") int year);
-
-  @Query(
-      value =
-          """
-        SELECT CAST(EXTRACT(DAY FROM created_at) AS INTEGER) as time_unit, COUNT(*)
-        FROM users
-        WHERE EXTRACT(MONTH FROM created_at) = :month
-          AND EXTRACT(YEAR FROM created_at) = :year
-        GROUP BY time_unit
-    """,
-      nativeQuery = true)
-  List<Object[]> countByMonth(@Param("month") int month, @Param("year") int year);
 }
