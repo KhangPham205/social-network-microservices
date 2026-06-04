@@ -1,5 +1,6 @@
 package com.socialnetwork.user_service.service.impl;
 
+import com.socialnetwork.user_service.client.AuthClient;
 import com.socialnetwork.user_service.dto.*;
 import com.socialnetwork.user_service.model.Friendship;
 import com.socialnetwork.user_service.model.User;
@@ -14,10 +15,8 @@ import io.github.perplexhub.rsql.RSQLJPASupport;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -39,6 +38,7 @@ public class UserServiceImpl implements UserService {
   private final UserRepository userRepository;
   private final UserRelaRepository userRelaRepository;
   private final FriendshipRepository friendshipRepository;
+  private final AuthClient authClient;
 
   private Long getCurrentUserId() {
     String userIdStr = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -325,6 +325,78 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public PageVO<AdminUserViewDto> getAllUsersForAdmin(String filter, Pageable pageable) {
+    Specification<User> spec = null;
+
+    if (filter != null && !filter.isBlank()) {
+      spec = RSQLJPASupport.toSpecification(filter);
+    }
+    
+    if (spec == null) {
+      spec = (root, query, cb) -> cb.conjunction();
+    }
+
+    Page<User> userPage = userRepository.findAll(spec, pageable);
+    if (userPage.isEmpty()) return buildEmptyPageVO(userPage);
+
+    List<Long> userIds = userPage.getContent().stream().map(User::getId).toList();
+
+    List<AuthCredentialDto> authInfos = authClient.getCredentialsBatch(userIds);
+    Map<Long, AuthCredentialDto> authMap =
+        authInfos.stream().collect(Collectors.toMap(AuthCredentialDto::getId, a -> a));
+
+    List<AdminUserViewDto> content =
+        userPage.getContent().stream()
+            .map(
+                user -> {
+                  AuthCredentialDto auth = authMap.get(user.getId());
+                  return toAdminViewDto(user, auth);
+                })
+            .toList();
+
+    return buildPageVO(userPage, content);
+  }
+
+  @Transactional
+  @Override
+  public AdminUserViewDto updateUserAsAdmin(Long userId, AdminUpdateUserRequest request) {
+    // 1. Cập nhật Profile (Local DB)
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+    if (request.getDisplayName() != null) user.setDisplayName(request.getDisplayName());
+    if (request.getBio() != null) {
+      if (user.getUserInfo() == null) user.setUserInfo(new UserInfo());
+      user.getUserInfo().setBio(request.getBio());
+    }
+    User savedUser = userRepository.save(user);
+
+    // 2. Cập nhật Role & Status (Gọi sang Auth DB)
+    if (request.getRoles() != null || request.getStatus() != null) {
+      UpdateRoleStatusRequest authUpdateReq =
+          new UpdateRoleStatusRequest(request.getStatus(), request.getRoles());
+      authClient.updateRoleAndStatus(userId, authUpdateReq);
+    }
+
+    // Return lại detail (Tái sử dụng hàm getDetail)
+    return getUserByIdAsAdmin(userId);
+  }
+
+  @Transactional(readOnly = true)
+  @Override
+  public AdminUserViewDto getUserByIdAsAdmin(Long userId) {
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    return toAdminViewDto(
+        user, authClient.getCredentialsBatch(List.of(userId)).stream().findFirst().orElse(null));
+  }
+
+  @Override
   public UserRelationDto getRelationWithUser(Long targetId) {
     User current = getCurrentUser();
     User target =
@@ -337,8 +409,10 @@ public class UserServiceImpl implements UserService {
 
   @Override
   public UserModerationDto getUserForModeration(Long userId) {
-    User user = userRepository.findById(userId)
-        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     return mapToModerationDto(user);
   }
 
@@ -428,7 +502,6 @@ public class UserServiceImpl implements UserService {
   /** Hàm thực thi query chung, map data và trả về PageVO */
   private PageVO<UserRelationDto> executePagedQuery(
       Specification<User> baseSpec, String filter, Pageable pageable, Long viewerId) {
-    // Gắn thêm filter tìm kiếm (nếu có)
     Specification<User> filterSpec = buildFilterSpec(filter);
     if (filterSpec != null) {
       baseSpec = baseSpec.and(filterSpec);
@@ -437,7 +510,6 @@ public class UserServiceImpl implements UserService {
     Page<User> page = userRepository.findAll(baseSpec, pageable);
     List<User> targets = page.getContent();
 
-    // TÁI SỬ DỤNG hàm N+1 mà chúng ta đã viết hôm trước!
     Map<Long, UserRelationDto> relationDtos = mapPageToRelationDtos(viewerId, targets);
 
     List<UserRelationDto> content = targets.stream().map(u -> relationDtos.get(u.getId())).toList();
@@ -460,7 +532,6 @@ public class UserServiceImpl implements UserService {
 
     filter = filter.trim();
 
-    // 🔥 thử parse RSQL trước
     if (filter.contains("==") || filter.contains("=like=")) {
       try {
         return RSQLJPASupport.toSpecification(filter);
@@ -520,7 +591,55 @@ public class UserServiceImpl implements UserService {
         .dateOfBirth(base.getDateOfBirth())
         .isFollowing(isFollowing)
         .isFollowedBy(isFollowedBy)
-        .friendship(friendship) // Use the properly built friendship response
+        .friendship(friendship)
+        .build();
+  }
+
+  private AdminUserViewDto toAdminViewDto(User user, AuthCredentialDto authInfo) {
+    AdminUserViewDto dto = new AdminUserViewDto();
+
+    dto.setId(user.getId());
+    dto.setDisplayName(user.getDisplayName());
+    dto.setAvatarUrl(user.getAvatarUrl());
+
+    if (user.getUserInfo() != null) {
+      dto.setBio(user.getUserInfo().getBio());
+      dto.setDateOfBirth(user.getUserInfo().getDateOfBirth());
+      dto.setFavorites(user.getUserInfo().getFavorites());
+    }
+
+    if (authInfo != null) {
+      dto.setCredentialId(authInfo.getId());
+      dto.setUsername(authInfo.getUsername());
+      dto.setEmail(authInfo.getEmail());
+      dto.setStatus(authInfo.getStatus());
+      dto.setRoles(authInfo.getRoles());
+    }
+
+    return dto;
+  }
+
+  private <T> PageVO<T> buildPageVO(Page<?> page, List<T> content) {
+    List<T> finalContent = (content == null) ? Collections.emptyList() : content;
+
+    return PageVO.<T>builder()
+        .page(page.getNumber())
+        .size(page.getSize())
+        .totalElements(page.getTotalElements())
+        .totalPages(page.getTotalPages())
+        .numberOfElements(finalContent.size())
+        .content(finalContent)
+        .build();
+  }
+
+  private <T> PageVO<T> buildEmptyPageVO(Page<?> page) {
+    return PageVO.<T>builder()
+        .page(page.getNumber())
+        .size(page.getSize())
+        .totalElements(page.getTotalElements())
+        .totalPages(page.getTotalPages())
+        .numberOfElements(0)
+        .content(Collections.emptyList())
         .build();
   }
 }

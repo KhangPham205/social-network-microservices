@@ -4,6 +4,7 @@ import com.socialnetwork.media_service.dto.comment.CommentRequest;
 import com.socialnetwork.media_service.dto.comment.CommentResponse;
 import com.socialnetwork.media_service.dto.comment.UpdateCommentRequest;
 import com.socialnetwork.media_service.service.CommentService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
@@ -11,8 +12,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vo.PageVO;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/media/comments")

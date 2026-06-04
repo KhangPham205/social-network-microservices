@@ -212,6 +212,14 @@ services:
       - kafka
     networks:
       - social-network-net
+  ai-service:
+    build: ./ai-service
+    container_name: ai-service
+    ports:
+      - "8000:5000"
+    networks:
+      - social-network-net
+
 
 # Đã bổ sung đầy đủ ổ cứng ảo
 volumes:

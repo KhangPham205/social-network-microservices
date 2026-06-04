@@ -32,7 +32,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
                     .requestMatchers(
-                        "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/aggregate/**")
+                        "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/aggregate/**", "/error")
                     .permitAll()
                     .requestMatchers("/api/v1/media/**")
                     .authenticated()

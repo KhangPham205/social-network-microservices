@@ -30,5 +30,6 @@ public interface PostService {
   void deletePost(Long postId);
 
   Long getPostOwnerId(Long postId);
+
   List<PostResponse> getPostsByIds(List<Long> ids);
 }

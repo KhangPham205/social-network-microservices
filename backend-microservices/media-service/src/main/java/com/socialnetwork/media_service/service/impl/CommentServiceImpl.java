@@ -1,12 +1,13 @@
 package com.socialnetwork.media_service.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socialnetwork.media_service.client.UserServiceClient;
 import com.socialnetwork.media_service.dto.comment.CommentRequest;
 import com.socialnetwork.media_service.dto.comment.CommentResponse;
 import com.socialnetwork.media_service.dto.comment.UpdateCommentRequest;
 import com.socialnetwork.media_service.dto.react.ReactSummaryDto;
 import com.socialnetwork.media_service.enums.AccessScope;
-import com.socialnetwork.media_service.events.ContentCreatedEvent;
+import events.ContentCreatedEvent;
 import com.socialnetwork.media_service.mapper.CommentMapper;
 import com.socialnetwork.media_service.model.Comment;
 import com.socialnetwork.media_service.model.Post;
@@ -19,7 +20,6 @@ import com.socialnetwork.media_service.service.ReactService;
 import com.socialnetwork.media_service.service.StorageService;
 import exception.AccessDeniedException;
 import exception.ResourceNotFoundException;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +47,7 @@ public class CommentServiceImpl implements CommentService {
   private final ReactService reactService;
   private final CommentMapper commentMapper;
   private final KafkaTemplate<String, Object> kafkaTemplate;
+  private final ObjectMapper objectMapper;
 
   @Override
   @Transactional
@@ -96,10 +97,14 @@ public class CommentServiceImpl implements CommentService {
     postRepository.updateCommentCount(post.getId(), 1);
 
     // Bắn sự kiện ra Kafka (Cho AI Moderation hoặc Notification)
-    kafkaTemplate.send(
-        "content-created-topic",
-        new ContentCreatedEvent(
-            saved.getId(), "COMMENT", saved.getContent(), author.getId(), saved.getMedia()));
+    try {
+        ContentCreatedEvent event = new ContentCreatedEvent(
+            saved.getId(), "COMMENT", saved.getContent(), author.getId(), saved.getMedia());
+        String payload = objectMapper.writeValueAsString(event);
+        kafkaTemplate.send("content-created-topic", payload);
+    } catch (Exception e) {
+        log.error("Failed to send content-created event for comment", e);
+    }
 
     // Bắn notification event
     Long notificationReceiverId =
@@ -162,8 +167,10 @@ public class CommentServiceImpl implements CommentService {
   @Override
   @Transactional
   public void updateSystemBanStatus(Long commentId, boolean isBanned) {
-    Comment comment = commentRepository.findById(commentId)
-        .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+    Comment comment =
+        commentRepository
+            .findById(commentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
     comment.setDeletedAt(isBanned ? Instant.now() : null);
     comment.setIsSystemBan(isBanned);
@@ -196,8 +203,10 @@ public class CommentServiceImpl implements CommentService {
 
   @Override
   public Long getCommentOwnerId(Long commentId) {
-    Comment comment = commentRepository.findById(commentId)
-        .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+    Comment comment =
+        commentRepository
+            .findById(commentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
     return comment.getAuthor().getId();
   }
 

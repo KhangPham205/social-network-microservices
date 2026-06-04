@@ -1,9 +1,6 @@
-package com.socialnetwork.moderation_service.config;
+package com.socialnetwork.user_service.config;
 
-import com.socialnetwork.moderation_service.client.AuthClient;
-import com.socialnetwork.moderation_service.client.ChatClient;
-import com.socialnetwork.moderation_service.client.MediaClient;
-import com.socialnetwork.moderation_service.client.UserClient;
+import com.socialnetwork.user_service.client.AuthClient;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.hc.client5.http.config.RequestConfig;
@@ -56,7 +53,11 @@ public class HttpExchangeConfig {
                   (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
               if (attributes != null) {
                 HttpServletRequest servletRequest = attributes.getRequest();
-                if (servletRequest.getCookies() != null) {
+                String authHeader = servletRequest.getHeader(HttpHeaders.AUTHORIZATION);
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                  request.getHeaders().set(HttpHeaders.AUTHORIZATION, authHeader);
+                }
+                else if (servletRequest.getCookies() != null) {
                   for (Cookie cookie : servletRequest.getCookies()) {
                     if ("jwt".equals(cookie.getName())) {
                       request.getHeaders().add(HttpHeaders.COOKIE, "jwt=" + cookie.getValue());
@@ -75,28 +76,5 @@ public class HttpExchangeConfig {
     RestClient restClient = builder.baseUrl("http://auth-service").build();
     RestClientAdapter adapter = RestClientAdapter.create(restClient);
     return HttpServiceProxyFactory.builderFor(adapter).build().createClient(AuthClient.class);
-  }
-
-  @Bean
-  public MediaClient mediaClient(@Qualifier("microserviceBuilder") RestClient.Builder builder) {
-    RestClient restClient = builder.baseUrl("http://media-service").build();
-    RestClientAdapter adapter = RestClientAdapter.create(restClient);
-    return HttpServiceProxyFactory.builderFor(adapter).build().createClient(MediaClient.class);
-  }
-
-  @Bean
-  public ChatClient chatClient(@Qualifier("microserviceBuilder") RestClient.Builder builder) {
-    RestClient restClient = builder.baseUrl("http://chat-service").build();
-    RestClientAdapter adapter = RestClientAdapter.create(restClient);
-    return HttpServiceProxyFactory.builderFor(adapter).build().createClient(ChatClient.class);
-  }
-
-  @Bean
-  public UserClient userClient(@Qualifier("microserviceBuilder") RestClient.Builder builder) {
-    RestClient restClient = builder.baseUrl("http://user-service").build();
-    RestClientAdapter adapter = RestClientAdapter.create(restClient);
-    HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();
-
-    return factory.createClient(UserClient.class);
   }
 }

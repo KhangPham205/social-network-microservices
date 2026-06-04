@@ -30,6 +30,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
+    if (request.getRequestURI().startsWith("/api/v1/auth/internal")) {
+      filterChain.doFilter(request, response);
+      return;
+    }
+
     String token = getJwtFromCookies(request);
 
     // Nếu không có token, cho đi tiếp (sẽ bị Spring Security chặn lại sau nếu API đó yêu cầu auth)

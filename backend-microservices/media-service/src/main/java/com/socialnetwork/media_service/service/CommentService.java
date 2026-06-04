@@ -3,10 +3,9 @@ package com.socialnetwork.media_service.service;
 import com.socialnetwork.media_service.dto.comment.CommentRequest;
 import com.socialnetwork.media_service.dto.comment.CommentResponse;
 import com.socialnetwork.media_service.dto.comment.UpdateCommentRequest;
+import java.util.List;
 import org.springframework.data.domain.Pageable;
 import vo.PageVO;
-
-import java.util.List;
 
 public interface CommentService {
   CommentResponse createComment(CommentRequest request);
@@ -24,5 +23,6 @@ public interface CommentService {
   void deleteComment(Long id);
 
   Long getCommentOwnerId(Long commentId);
+
   List<CommentResponse> getCommentsByIds(List<Long> ids);
 }

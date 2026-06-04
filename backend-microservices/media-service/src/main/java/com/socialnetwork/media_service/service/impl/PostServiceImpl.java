@@ -1,11 +1,12 @@
 package com.socialnetwork.media_service.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socialnetwork.media_service.client.UserServiceClient;
 import com.socialnetwork.media_service.dto.post.PostResponse;
 import com.socialnetwork.media_service.dto.post.UpdatePostRequest;
 import com.socialnetwork.media_service.dto.react.ReactSummaryDto;
 import com.socialnetwork.media_service.enums.AccessScope;
-import com.socialnetwork.media_service.events.ContentCreatedEvent;
+import events.ContentCreatedEvent;
 import com.socialnetwork.media_service.mapper.PostMapper;
 import com.socialnetwork.media_service.model.Post;
 import com.socialnetwork.media_service.model.UserCache;
@@ -47,6 +48,7 @@ public class PostServiceImpl implements PostService {
   private final ReactService reactService;
   private final PostMapper postMapper;
   private final KafkaTemplate<String, Object> kafkaTemplate;
+  private final ObjectMapper objectMapper;
 
   @Override
   @Transactional
@@ -83,14 +85,18 @@ public class PostServiceImpl implements PostService {
     Post savedPost = postRepository.save(post);
 
     // 4. Bắn sự kiện ra Kafka cho AI Moderation check hoặc Notification Service
-    kafkaTemplate.send(
-        "content-created-topic",
-        new ContentCreatedEvent(
+    try {
+        ContentCreatedEvent event = new ContentCreatedEvent(
             savedPost.getId(),
             "POST",
             savedPost.getContent(),
             author.getId(),
-            savedPost.getMedia()));
+            savedPost.getMedia());
+        String payload = objectMapper.writeValueAsString(event);
+        kafkaTemplate.send("content-created-topic", payload);
+    } catch (Exception e) {
+        log.error("Failed to send content-created event", e);
+    }
 
     return toDtoWithDetails(savedPost, currentUserId);
   }
@@ -147,8 +153,10 @@ public class PostServiceImpl implements PostService {
   @Override
   @Transactional
   public void updateSystemBanStatus(Long postId, boolean isBanned) {
-    Post post = postRepository.findById(postId)
-        .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+    Post post =
+        postRepository
+            .findById(postId)
+            .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
     post.setDeletedAt(isBanned ? Instant.now() : null);
     post.setIsSystemBan(isBanned);
@@ -316,8 +324,10 @@ public class PostServiceImpl implements PostService {
 
   @Override
   public Long getPostOwnerId(Long postId) {
-    Post post = postRepository.findById(postId)
-        .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+    Post post =
+        postRepository
+            .findById(postId)
+            .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
     return post.getAuthor().getId();
   }
 

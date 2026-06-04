@@ -15,10 +15,8 @@ import com.socialnetwork.moderation_service.repository.ReportRepository;
 import exception.BadRequestException;
 import exception.ResourceNotFoundException;
 import io.github.perplexhub.rsql.RSQLJPASupport;
-
 import java.util.*;
 import java.util.stream.Collectors;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -63,7 +61,8 @@ public class ReportServiceImpl implements ReportService {
             .targetId(request.getTargetId())
             .targetUserId(targetOwnerId)
             .reason(request.getReason())
-            .customReason(request.getReason().name().equals("OTHER") ? request.getCustomReason() : null)
+            .customReason(
+                request.getReason().name().equals("OTHER") ? request.getCustomReason() : null)
             .status(ReportStatus.PENDING)
             .isBannedBySystem(false)
             .build();
@@ -196,14 +195,16 @@ public class ReportServiceImpl implements ReportService {
   public PageVO<ReportResponse> getReportsByContent(
       String targetId, TargetType targetType, Pageable pageable) {
 
-    Page<Report> page = reportRepository.findByTargetTypeAndTargetId(targetType, targetId, pageable);
+    Page<Report> page =
+        reportRepository.findByTargetTypeAndTargetId(targetType, targetId, pageable);
     if (page.isEmpty()) return buildEmptyPageVO(page);
 
-    List<Long> reporterIds = page.getContent().stream()
-        .map(Report::getReporterId)
-        .filter(Objects::nonNull)
-        .distinct()
-        .toList();
+    List<Long> reporterIds =
+        page.getContent().stream()
+            .map(Report::getReporterId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
 
     Map<Long, UserExternalDto> userMap = new HashMap<>();
     if (!reporterIds.isEmpty()) {
@@ -216,20 +217,25 @@ public class ReportServiceImpl implements ReportService {
     }
 
     Map<Long, UserExternalDto> finalUserMap = userMap;
-    List<ReportResponse> content = page.getContent().stream().map(report -> {
-      ReportResponse response = reportMapper.toResponse(report);
+    List<ReportResponse> content =
+        page.getContent().stream()
+            .map(
+                report -> {
+                  ReportResponse response = reportMapper.toResponse(report);
 
-      if (report.getReporterId() != null && finalUserMap.containsKey(report.getReporterId())) {
-        UserExternalDto user = finalUserMap.get(report.getReporterId());
-        response.setReporterName(user.getDisplayName());
-        response.setReporterAvatar(user.getAvatarUrl());
-      }
+                  if (report.getReporterId() != null
+                      && finalUserMap.containsKey(report.getReporterId())) {
+                    UserExternalDto user = finalUserMap.get(report.getReporterId());
+                    response.setReporterName(user.getDisplayName());
+                    response.setReporterAvatar(user.getAvatarUrl());
+                  }
 
-      if (response.getStatus() == null) response.setStatus(ReportStatus.PENDING);
-      if (response.getIsBannedBySystem() == null) response.setIsBannedBySystem(false);
+                  if (response.getStatus() == null) response.setStatus(ReportStatus.PENDING);
+                  if (response.getIsBannedBySystem() == null) response.setIsBannedBySystem(false);
 
-      return response;
-    }).toList();
+                  return response;
+                })
+            .toList();
 
     return PageVO.<ReportResponse>builder()
         .page(page.getNumber())
@@ -246,14 +252,16 @@ public class ReportServiceImpl implements ReportService {
   public PageVO<ComplaintResponse> getComplaintsByContent(
       String targetId, TargetType targetType, Pageable pageable) {
 
-    Page<Complaint> page = complaintRepository.findByTargetTypeAndTargetId(targetType, targetId, pageable);
+    Page<Complaint> page =
+        complaintRepository.findByTargetTypeAndTargetId(targetType, targetId, pageable);
     if (page.isEmpty()) return buildEmptyPageVO(page);
 
-    List<Long> userIds = page.getContent().stream()
-        .map(Complaint::getUserId)
-        .filter(Objects::nonNull)
-        .distinct()
-        .toList();
+    List<Long> userIds =
+        page.getContent().stream()
+            .map(Complaint::getUserId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
 
     Map<Long, UserExternalDto> userMap = new HashMap<>();
     if (!userIds.isEmpty()) {
@@ -266,18 +274,23 @@ public class ReportServiceImpl implements ReportService {
     }
 
     Map<Long, UserExternalDto> finalUserMap = userMap;
-    List<ComplaintResponse> content = page.getContent().stream().map(complaint -> {
-      ComplaintResponse response = reportMapper.toResponse(complaint);
+    List<ComplaintResponse> content =
+        page.getContent().stream()
+            .map(
+                complaint -> {
+                  ComplaintResponse response = reportMapper.toResponse(complaint);
 
-      if (complaint.getUserId() != null && finalUserMap.containsKey(complaint.getUserId())) {
-        UserExternalDto user = finalUserMap.get(complaint.getUserId());
-        response.setUserDisplayName(user.getDisplayName());
-      }
+                  if (complaint.getUserId() != null
+                      && finalUserMap.containsKey(complaint.getUserId())) {
+                    UserExternalDto user = finalUserMap.get(complaint.getUserId());
+                    response.setUserDisplayName(user.getDisplayName());
+                  }
 
-      if (response.getStatus() == null) response.setStatus(ComplaintStatus.PENDING);
+                  if (response.getStatus() == null) response.setStatus(ComplaintStatus.PENDING);
 
-      return response;
-    }).toList();
+                  return response;
+                })
+            .toList();
 
     return PageVO.<ComplaintResponse>builder()
         .page(page.getNumber())

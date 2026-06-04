@@ -129,33 +129,41 @@ public class ModerationServiceImpl implements ModerationService {
     Page<IdCount> reportedUsersPage = reportRepository.findTopReportedUsers(pageable);
     if (reportedUsersPage.isEmpty()) return buildEmptyPageVO(reportedUsersPage);
 
-    List<Long> userIds = reportedUsersPage.getContent().stream()
-        .map(idCount -> Long.valueOf(String.valueOf(idCount.getId()))).toList();
+    List<Long> userIds =
+        reportedUsersPage.getContent().stream()
+            .map(idCount -> Long.valueOf(String.valueOf(idCount.getId())))
+            .toList();
 
     List<UserExternalDto> userProfiles = userClient.getUsersByIds(userIds);
     List<AuthExternalDto> authInfos = authClient.getCredentialsByIds(userIds);
 
-    Map<Long, UserExternalDto> profileMap = userProfiles.stream().collect(Collectors.toMap(UserExternalDto::getId, u -> u));
-    Map<Long, AuthExternalDto> authMap = authInfos.stream().collect(Collectors.toMap(AuthExternalDto::getId, a -> a));
+    Map<Long, UserExternalDto> profileMap =
+        userProfiles.stream().collect(Collectors.toMap(UserExternalDto::getId, u -> u));
+    Map<Long, AuthExternalDto> authMap =
+        authInfos.stream().collect(Collectors.toMap(AuthExternalDto::getId, a -> a));
 
-    List<UserModerationResponse> content = reportedUsersPage.getContent().stream().map(idCount -> {
-      Long uid = Long.valueOf(String.valueOf(idCount.getId()));
+    List<UserModerationResponse> content =
+        reportedUsersPage.getContent().stream()
+            .map(
+                idCount -> {
+                  Long uid = Long.valueOf(String.valueOf(idCount.getId()));
 
-      UserExternalDto profile = profileMap.get(uid);
-      AuthExternalDto auth = authMap.get(uid);
+                  UserExternalDto profile = profileMap.get(uid);
+                  AuthExternalDto auth = authMap.get(uid);
 
-      if (profile == null || auth == null) return null;
+                  if (profile == null || auth == null) return null;
 
-      return new UserModerationResponse(
-          uid,
-          auth.getUsername(),      // Từ Auth
-          auth.getEmail(),         // Từ Auth
-          profile.getDisplayName(),// Từ User
-          profile.getAvatarUrl(),  // Từ User
-          auth.getStatus(),        // Từ Auth
-          idCount.getCount()
-      );
-    }).filter(Objects::nonNull).toList();
+                  return new UserModerationResponse(
+                      uid,
+                      auth.getUsername(), // Từ Auth
+                      auth.getEmail(), // Từ Auth
+                      profile.getDisplayName(), // Từ User
+                      profile.getAvatarUrl(), // Từ User
+                      auth.getStatus(), // Từ Auth
+                      idCount.getCount());
+                })
+            .filter(Objects::nonNull)
+            .toList();
 
     return buildPageVO(reportedUsersPage, content);
   }
@@ -189,7 +197,12 @@ public class ModerationServiceImpl implements ModerationService {
 
     PostResponse post = posts.get(0);
 
-    enrichWithCounts(List.of(post), PostResponse::getId, PostResponse::setReportCount, PostResponse::setComplaintCount, TargetType.POST);
+    enrichWithCounts(
+        List.of(post),
+        PostResponse::getId,
+        PostResponse::setReportCount,
+        PostResponse::setComplaintCount,
+        TargetType.POST);
 
     return post;
   }
@@ -224,7 +237,12 @@ public class ModerationServiceImpl implements ModerationService {
 
     CommentResponse comment = comments.get(0);
 
-    enrichWithCounts(List.of(comment), CommentResponse::getId, CommentResponse::setReportCount, CommentResponse::setComplaintCount, TargetType.COMMENT);
+    enrichWithCounts(
+        List.of(comment),
+        CommentResponse::getId,
+        CommentResponse::setReportCount,
+        CommentResponse::setComplaintCount,
+        TargetType.COMMENT);
 
     return comment;
   }
@@ -260,10 +278,14 @@ public class ModerationServiceImpl implements ModerationService {
   @Override
   @Transactional(readOnly = true)
   public PageVO<ModerationLogResponse> getModerationLogs(String filter, Pageable pageable) {
-    Specification<ModerationLog> spec = Specification.where((Specification<ModerationLog>) null);
+    Specification<ModerationLog> spec = null;
     if (filter != null && !filter.isBlank()) {
       spec = RSQLJPASupport.toSpecification(filter);
     }
+    if (spec == null) {
+      spec = (root, query, cb) -> cb.conjunction();
+    }
+
     Page<ModerationLog> page = moderationLogRepository.findAll(spec, pageable);
     List<ModerationLogResponse> content =
         page.getContent().stream().map(this::mapLogToResponse).toList();

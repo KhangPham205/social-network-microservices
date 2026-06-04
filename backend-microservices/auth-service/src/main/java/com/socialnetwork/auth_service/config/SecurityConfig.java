@@ -38,7 +38,7 @@ public class SecurityConfig {
             auth ->
                 auth
                     // Public endpoints
-                    .requestMatchers("/api/v1/auth/**")
+                    .requestMatchers("/api/v1/auth/**", "/error")
                     .permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**")
                     .permitAll()

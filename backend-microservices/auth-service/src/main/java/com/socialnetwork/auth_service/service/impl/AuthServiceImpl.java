@@ -1,5 +1,6 @@
 package com.socialnetwork.auth_service.service.impl;
 
+import com.socialnetwork.auth_service.client.UserServiceClient;
 import com.socialnetwork.auth_service.dto.*;
 import com.socialnetwork.auth_service.enums.AccountStatus;
 import com.socialnetwork.auth_service.enums.OtpType;
@@ -48,6 +49,7 @@ public class AuthServiceImpl implements AuthService {
   private final RefreshTokenService refreshTokenService;
   private final RefreshTokenRepository refreshTokenRepository;
   private final EmailService emailService;
+  private final UserServiceClient userClient;
 
   private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -189,6 +191,9 @@ public class AuthServiceImpl implements AuthService {
     if (userCredentialRepository.existsByUsername(request.getUsername())) {
       throw new BadRequestException("Username is already in use");
     }
+    if (userCredentialRepository.existsByEmail(request.getEmail())) {
+      throw new BadRequestException("Email is already in use");
+    }
 
     Role staffRole =
         roleRepository
@@ -196,64 +201,91 @@ public class AuthServiceImpl implements AuthService {
             .orElseThrow(
                 () -> new ResourceNotFoundException("Role not found: " + request.getRoleName()));
 
-    Set<Role> initialRoles = new HashSet<>();
-    initialRoles.add(staffRole);
-
     UserCredential userCredential =
         UserCredential.builder()
             .username(request.getUsername())
             .password(passwordEncoder.encode(request.getPassword()))
             .email(request.getEmail())
-            .roles(initialRoles)
+            .roles(Set.of(staffRole))
             .status(AccountStatus.ACTIVE)
             .build();
 
-    userCredentialRepository.save(userCredential);
+    UserCredential savedCredential = userCredentialRepository.save(userCredential);
+
+    try {
+      userClient.createEmptyProfile(savedCredential.getId(), request.getFullname());
+    } catch (Exception e) {
+      // Rollback nếu User Service lỗi
+      throw new RuntimeException("Lỗi khi tạo profile bên User Service: " + e.getMessage());
+    }
+
+    // Bắn sự kiện ra Kafka cho ActivityLogService (Nếu bạn có Audit Service riêng)
+    // kafkaTemplate.send("audit-topic", new ActivityLogEvent("USER:CREATE", "User",
+    // savedCredential.getId(), ...));
 
     return new RegisterResponse("Staff account created successfully");
   }
 
   @Override
-  public AuthCredentialDto getCredentialById(Long id) {
-    return userCredentialRepository.getUserCredentialById(id)
-        .map(
-            user -> {
-              Set<String> roleNames =
-                  user.getRoles().stream()
-                      .map(Role::getName)
-                      .collect(Collectors.toSet());
+  public void updateRoleAndStatus(Long credentialId, Set<String> roleNames, AccountStatus status) {
+    UserCredential credential =
+        userCredentialRepository
+            .findById(credentialId)
+            .orElseThrow(() -> new ResourceNotFoundException("Credential not found"));
 
-              return AuthCredentialDto.builder()
-                  .id(user.getId())
-                  .username(user.getUsername())
-                  .email(user.getEmail())
-                  .status(user.getStatus())
-                  .build();
-            })
-        .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+    if (roleNames != null && !roleNames.isEmpty()) {
+      Set<Role> newRoles =
+          roleNames.stream()
+              .map(
+                  name ->
+                      roleRepository
+                          .findByName(name.toUpperCase())
+                          .orElseThrow(() -> new BadRequestException("Role not found: " + name)))
+              .collect(Collectors.toSet());
+      credential.setRoles(newRoles);
+    }
+
+    if (status != null) {
+      credential.setStatus(status);
+    }
+    userCredentialRepository.save(credential);
   }
 
   @Override
-  public List<AuthCredentialDto> getCredentialsByIds(List<Long> ids) {
-    return userCredentialRepository.findByIdIn(ids).stream()
-        .map(
-            user -> {
-              Set<String> roleNames =
-                  user.getRoles().stream()
-                      .map(Role::getName)
-                      .collect(Collectors.toSet());
+  @Transactional(readOnly = true)
+  public AuthCredentialDto getCredentialById(Long id) {
+    UserCredential credential = userCredentialRepository.findById(id)
+        .orElseThrow(() -> new ResourceNotFoundException("Credential not found for ID: " + id));
 
-              return AuthCredentialDto.builder()
-                  .id(user.getId())
-                  .username(user.getUsername())
-                  .email(user.getEmail())
-                  .status(user.getStatus())
-                  .build();
-            })
-        .collect(Collectors.toList());
+    return mapToCredentialDto(credential);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<AuthCredentialDto> getCredentialsByIds(List<Long> ids) {
+    List<UserCredential> credentials = userCredentialRepository.findAllById(ids);
+
+    return credentials.stream()
+        .map(this::mapToCredentialDto)
+        .toList();
   }
 
   // --------------------- Helper methods --------------------------
+  private AuthCredentialDto mapToCredentialDto(UserCredential credential) {
+    // Rút trích tên các Role từ Set<Role> của Entity
+    Set<String> roleNames = credential.getRoles().stream()
+        .map(Role::getName) // Lấy ra cái tên (VD: "USER", "ADMIN")
+        .collect(Collectors.toSet());
+
+    return AuthCredentialDto.builder()
+        .id(credential.getId())
+        .username(credential.getUsername())
+        .email(credential.getEmail())
+        .status(credential.getStatus())
+        .roles(roleNames)
+        .build();
+  }
+
   private UserDetails buildUserDetails(UserCredential userCredential) {
     Set<Role> roles = userCredential.getRoles();
     Set<String> roleNames = new HashSet<>();

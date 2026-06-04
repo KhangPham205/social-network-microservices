@@ -1,4 +1,5 @@
 package com.socialnetwork.moderation_service.dto.external;
+
 import lombok.Data;
 
 @Data

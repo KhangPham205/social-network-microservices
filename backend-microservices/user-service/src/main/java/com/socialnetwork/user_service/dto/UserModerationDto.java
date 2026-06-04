@@ -1,10 +1,8 @@
 package com.socialnetwork.user_service.dto;
 
-import com.socialnetwork.user_service.model.User;
+import java.time.Instant;
 import lombok.Builder;
 import lombok.Data;
-
-import java.time.Instant;
 
 @Data
 @Builder

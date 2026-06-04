@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -45,5 +44,4 @@ public interface PostRepository extends JpaRepository<Post, Long>, JpaSpecificat
 
   @Query(value = "SELECT * FROM posts WHERE id = :id", nativeQuery = true)
   Optional<Post> findByIdIncludingDeleted(@Param("id") Long id);
-
 }

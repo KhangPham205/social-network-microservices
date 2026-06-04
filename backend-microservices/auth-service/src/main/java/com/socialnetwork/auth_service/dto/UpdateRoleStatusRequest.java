@@ -1,17 +1,11 @@
 package com.socialnetwork.auth_service.dto;
 
 import com.socialnetwork.auth_service.enums.AccountStatus;
-import lombok.Builder;
+import java.util.Set;
 import lombok.Data;
 
-import java.util.Set;
-
 @Data
-@Builder
-public class AuthCredentialDto {
-  private Long id;
-  private String username;
-  private String email;
+public class UpdateRoleStatusRequest {
   private AccountStatus status;
   private Set<String> roles;
 }

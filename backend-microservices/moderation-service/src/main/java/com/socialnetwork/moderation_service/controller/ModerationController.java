@@ -112,14 +112,18 @@ public class ModerationController {
   @GetMapping("/{type}/{id}/reports")
   @PreAuthorize("hasAuthority('MODERATION:ACCESS')")
   public ResponseEntity<PageVO<ReportResponse>> getContentReports(
-      @PathVariable("type") TargetType type, @PathVariable("id") String id, @ParameterObject Pageable pageable) {
+      @PathVariable("type") TargetType type,
+      @PathVariable("id") String id,
+      @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(reportService.getReportsByContent(id, type, pageable));
   }
 
   @GetMapping("/{type}/{id}/complaints")
   @PreAuthorize("hasAuthority('MODERATION:ACCESS')")
   public ResponseEntity<PageVO<ComplaintResponse>> getContentComplaints(
-      @PathVariable("type") TargetType type, @PathVariable("id") String id, @ParameterObject Pageable pageable) {
+      @PathVariable("type") TargetType type,
+      @PathVariable("id") String id,
+      @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(reportService.getComplaintsByContent(id, type, pageable));
   }
 

@@ -2,10 +2,10 @@ package com.socialnetwork.user_service.service;
 
 import com.socialnetwork.user_service.dto.*;
 import com.socialnetwork.user_service.model.User;
-import org.springframework.data.domain.Pageable;
-import vo.PageVO;
-
 import java.util.List;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
+import vo.PageVO;
 
 public interface UserService {
   // Hàm dành cho Auth Service gọi nội bộ khi có user đăng ký mới
@@ -28,6 +28,15 @@ public interface UserService {
   PageVO<UserRelationDto> getFollowingPaged(Long id, String filter, Pageable pageable);
 
   User getCurrentUser();
+
+  @Transactional(readOnly = true)
+  PageVO<AdminUserViewDto> getAllUsersForAdmin(String filter, Pageable pageable);
+
+  @Transactional
+  AdminUserViewDto updateUserAsAdmin(Long userId, AdminUpdateUserRequest request);
+
+  @Transactional(readOnly = true)
+  AdminUserViewDto getUserByIdAsAdmin(Long userId);
 
   UserRelationDto getRelationWithUser(Long id);
 

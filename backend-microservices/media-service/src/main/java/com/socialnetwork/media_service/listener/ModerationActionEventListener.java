@@ -1,7 +1,7 @@
 package com.socialnetwork.media_service.listener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.socialnetwork.media_service.events.ContentModerationEvent;
+import events.ModerationActionEvent;
 import com.socialnetwork.media_service.service.CommentService;
 import com.socialnetwork.media_service.service.PostService;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +21,14 @@ public class ModerationActionEventListener {
   @KafkaListener(topics = "moderation-actions", groupId = "media-service-group-v2")
   public void handleModerationAction(String messagePayload) {
     try {
-      ContentModerationEvent event = objectMapper.readValue(messagePayload, ContentModerationEvent.class);
+      ModerationActionEvent event =
+          objectMapper.readValue(messagePayload, ModerationActionEvent.class);
 
-      log.info("Nhận được lệnh từ Moderation: Action={}, Type={}, ID={}",
-          event.getAction(), event.getTargetType(), event.getTargetId());
+      log.info(
+          "Nhận được lệnh từ Moderation: Action={}, Type={}, ID={}",
+          event.getAction(),
+          event.getTargetType(),
+          event.getTargetId());
 
       Long targetId = Long.parseLong(event.getTargetId());
       boolean isBanned = "BLOCK".equalsIgnoreCase(event.getAction());
@@ -40,7 +44,10 @@ public class ModerationActionEventListener {
       }
 
     } catch (Exception e) {
-      log.error("Lỗi khi xử lý tín hiệu Kafka: Message [{}]. Chi tiết: {}", messagePayload, e.getMessage());
+      log.error(
+          "Lỗi khi xử lý tín hiệu Kafka: Message [{}]. Chi tiết: {}",
+          messagePayload,
+          e.getMessage());
     }
   }
 }
