@@ -56,8 +56,7 @@ public class HttpExchangeConfig {
                 String authHeader = servletRequest.getHeader(HttpHeaders.AUTHORIZATION);
                 if (authHeader != null && authHeader.startsWith("Bearer ")) {
                   request.getHeaders().set(HttpHeaders.AUTHORIZATION, authHeader);
-                }
-                else if (servletRequest.getCookies() != null) {
+                } else if (servletRequest.getCookies() != null) {
                   for (Cookie cookie : servletRequest.getCookies()) {
                     if ("jwt".equals(cookie.getName())) {
                       request.getHeaders().add(HttpHeaders.COOKIE, "jwt=" + cookie.getValue());

@@ -19,6 +19,7 @@ import com.socialnetwork.moderation_service.repository.ComplaintRepository;
 import com.socialnetwork.moderation_service.repository.ModerationLogRepository;
 import com.socialnetwork.moderation_service.repository.ReportRepository;
 import dto.IdCount;
+import events.ModerationActionEvent;
 import exception.BadRequestException;
 import exception.ResourceNotFoundException;
 import io.github.perplexhub.rsql.RSQLJPASupport;
@@ -322,8 +323,8 @@ public class ModerationServiceImpl implements ModerationService {
   public void blockContent(String idStr, TargetType targetType) {
     Long adminId = getCurrentAdminIdSafely();
 
-    ContentModerationEvent event = new ContentModerationEvent(idStr, targetType, "BLOCK");
-    kafkaTemplate.send(MODERATION_ACTIONS_TOPIC, idStr, event);
+    ModerationActionEvent event = new ModerationActionEvent(idStr, targetType.name(), "BLOCK");
+    kafkaTemplate.send("moderation-actions", idStr, event);
 
     saveLog(adminId, targetType, idStr, "BLOCK", "Admin blocked content");
   }

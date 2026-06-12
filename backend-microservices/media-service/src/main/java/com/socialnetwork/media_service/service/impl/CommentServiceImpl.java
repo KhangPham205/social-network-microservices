@@ -7,7 +7,6 @@ import com.socialnetwork.media_service.dto.comment.CommentResponse;
 import com.socialnetwork.media_service.dto.comment.UpdateCommentRequest;
 import com.socialnetwork.media_service.dto.react.ReactSummaryDto;
 import com.socialnetwork.media_service.enums.AccessScope;
-import events.ContentCreatedEvent;
 import com.socialnetwork.media_service.mapper.CommentMapper;
 import com.socialnetwork.media_service.model.Comment;
 import com.socialnetwork.media_service.model.Post;
@@ -18,6 +17,7 @@ import com.socialnetwork.media_service.repository.UserCacheRepository;
 import com.socialnetwork.media_service.service.CommentService;
 import com.socialnetwork.media_service.service.ReactService;
 import com.socialnetwork.media_service.service.StorageService;
+import events.ContentCreatedEvent;
 import exception.AccessDeniedException;
 import exception.ResourceNotFoundException;
 import java.time.Instant;
@@ -98,12 +98,13 @@ public class CommentServiceImpl implements CommentService {
 
     // Bắn sự kiện ra Kafka (Cho AI Moderation hoặc Notification)
     try {
-        ContentCreatedEvent event = new ContentCreatedEvent(
-            saved.getId(), "COMMENT", saved.getContent(), author.getId(), saved.getMedia());
-        String payload = objectMapper.writeValueAsString(event);
-        kafkaTemplate.send("content-created-topic", payload);
+      ContentCreatedEvent event =
+          new ContentCreatedEvent(
+              saved.getId(), "COMMENT", saved.getContent(), author.getId(), saved.getMedia());
+      String payload = objectMapper.writeValueAsString(event);
+      kafkaTemplate.send("content-created-topic", payload);
     } catch (Exception e) {
-        log.error("Failed to send content-created event for comment", e);
+      log.error("Failed to send content-created event for comment", e);
     }
 
     // Bắn notification event

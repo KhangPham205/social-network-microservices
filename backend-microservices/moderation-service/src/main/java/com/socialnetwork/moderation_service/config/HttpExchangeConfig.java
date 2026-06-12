@@ -1,9 +1,6 @@
 package com.socialnetwork.moderation_service.config;
 
-import com.socialnetwork.moderation_service.client.AuthClient;
-import com.socialnetwork.moderation_service.client.ChatClient;
-import com.socialnetwork.moderation_service.client.MediaClient;
-import com.socialnetwork.moderation_service.client.UserClient;
+import com.socialnetwork.moderation_service.client.*;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.hc.client5.http.config.RequestConfig;
@@ -11,6 +8,7 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.util.Timeout;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -98,5 +96,17 @@ public class HttpExchangeConfig {
     HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();
 
     return factory.createClient(UserClient.class);
+  }
+
+  @Bean
+  public AiServiceClient aiServiceClient(
+      @Qualifier("defaultRestClientBuilder") RestClient.Builder defaultBuilder,
+      @Value("${ai-service.url:http://localhost:8000}") String aiServiceUrl) {
+
+    RestClient restClient = defaultBuilder.baseUrl(aiServiceUrl).build();
+    RestClientAdapter adapter = RestClientAdapter.create(restClient);
+    return HttpServiceProxyFactory.builderFor(adapter)
+        .build()
+        .createClient(com.socialnetwork.moderation_service.client.AiServiceClient.class);
   }
 }

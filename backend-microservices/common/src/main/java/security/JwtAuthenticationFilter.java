@@ -70,6 +70,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   }
 
   private String getJwtFromCookies(HttpServletRequest request) {
+    // 1. Kiểm tra Authorization Header trước (Authorization: Bearer <token>)
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+      return authHeader.substring(7);
+    }
+
+    // 2. Nếu không có, kiểm tra Cookies
     if (request.getCookies() != null) {
       for (Cookie cookie : request.getCookies()) {
         if ("jwt".equals(cookie.getName())) {

@@ -6,7 +6,6 @@ import com.socialnetwork.media_service.dto.post.PostResponse;
 import com.socialnetwork.media_service.dto.post.UpdatePostRequest;
 import com.socialnetwork.media_service.dto.react.ReactSummaryDto;
 import com.socialnetwork.media_service.enums.AccessScope;
-import events.ContentCreatedEvent;
 import com.socialnetwork.media_service.mapper.PostMapper;
 import com.socialnetwork.media_service.model.Post;
 import com.socialnetwork.media_service.model.UserCache;
@@ -14,7 +13,9 @@ import com.socialnetwork.media_service.repository.PostRepository;
 import com.socialnetwork.media_service.repository.UserCacheRepository;
 import com.socialnetwork.media_service.service.PostService;
 import com.socialnetwork.media_service.service.ReactService;
+import com.socialnetwork.media_service.service.RecommendationService;
 import com.socialnetwork.media_service.service.StorageService;
+import events.ContentCreatedEvent;
 import exception.AccessDeniedException;
 import exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
@@ -43,8 +44,9 @@ public class PostServiceImpl implements PostService {
 
   private final PostRepository postRepository;
   private final UserCacheRepository userCacheRepository;
-  private final UserServiceClient userServiceClient; // Gọi sang user-service
-  private final StorageService storageService; // Xử lý upload Minio
+  private final UserServiceClient userServiceClient;
+  private final StorageService storageService;
+  private final RecommendationService recommendationService;
   private final ReactService reactService;
   private final PostMapper postMapper;
   private final KafkaTemplate<String, Object> kafkaTemplate;
@@ -86,16 +88,17 @@ public class PostServiceImpl implements PostService {
 
     // 4. Bắn sự kiện ra Kafka cho AI Moderation check hoặc Notification Service
     try {
-        ContentCreatedEvent event = new ContentCreatedEvent(
-            savedPost.getId(),
-            "POST",
-            savedPost.getContent(),
-            author.getId(),
-            savedPost.getMedia());
-        String payload = objectMapper.writeValueAsString(event);
-        kafkaTemplate.send("content-created-topic", payload);
+      ContentCreatedEvent event =
+          new ContentCreatedEvent(
+              savedPost.getId(),
+              "POST",
+              savedPost.getContent(),
+              author.getId(),
+              savedPost.getMedia());
+      String payload = objectMapper.writeValueAsString(event);
+      kafkaTemplate.send("content-created-topic", payload);
     } catch (Exception e) {
-        log.error("Failed to send content-created event", e);
+      log.error("Failed to send content-created event", e);
     }
 
     return toDtoWithDetails(savedPost, currentUserId);
@@ -180,52 +183,63 @@ public class PostServiceImpl implements PostService {
 
   @Override
   @Transactional(readOnly = true)
-  @Cacheable(value = "newsfeed", key = "#currentUserId + '_' + #pageable.pageNumber")
   public PageVO<PostResponse> getFeed(Pageable pageable, String filter) {
     Long currentUserId = getCurrentUserId();
 
-    List<Long> networkIds = new ArrayList<>(userServiceClient.getNetworkIds(currentUserId));
-    if (!networkIds.contains(currentUserId)) {
-      networkIds.add(currentUserId);
+    // 1. Lấy danh sách ID từ Recommendation (Milvus + Neo4j)
+    List<Long> recommendedPostIds = recommendationService.getExploreFeed(currentUserId, filter);
+
+    if (recommendedPostIds.isEmpty()) {
+      return buildEmptyPage(pageable);
     }
+
+    // 2. Lấy networkId và xây dựng Rule bảo mật (như code cũ)
+    List<Long> networkIds = new ArrayList<>(userServiceClient.getNetworkIds(currentUserId));
+    if (!networkIds.contains(currentUserId)) networkIds.add(currentUserId);
 
     Specification<Post> spec =
         (root, query, cb) -> {
+          // Chỉ lấy những Post có ID nằm trong danh sách AI gợi ý
+          Predicate idInRecommendation = root.get("id").in(recommendedPostIds);
+
+          // --- Giữ nguyên các rule bảo mật cũ ---
           Predicate authorInNetwork = root.get("author").get("id").in(networkIds);
           Predicate notBanned = cb.isFalse(root.get("isSystemBan"));
           Predicate notDeleted = cb.isNull(root.get("deletedAt"));
           Predicate isMyPost = cb.equal(root.get("author").get("id"), currentUserId);
           Predicate visibilityCondition = cb.or(notBanned, notDeleted, isMyPost);
 
-          // Logic quyền xem:
           Predicate isPublic = cb.equal(root.get("accessModifier"), AccessScope.PUBLIC);
           Predicate isFriendScope =
               cb.and(
                   cb.equal(root.get("accessModifier"), AccessScope.FRIENDS),
-                  root.get("author")
-                      .get("id")
-                      .in(networkIds) // Bài bạn bè & tác giả nằm trong network
-                  );
+                  root.get("author").get("id").in(networkIds));
           Predicate isPrivateAndMine =
               cb.and(
                   cb.equal(root.get("accessModifier"), AccessScope.PRIVATE),
                   cb.equal(root.get("author").get("id"), currentUserId));
 
           Predicate accessControl = cb.or(isPublic, isFriendScope, isPrivateAndMine);
-          Predicate finalPredicate = cb.and(authorInNetwork, visibilityCondition, accessControl);
 
-          // Filter theo keyword nếu có
-          if (filter != null && !filter.isBlank()) {
-            Predicate filterPredicate =
-                cb.like(cb.lower(root.get("content")), "%" + filter.toLowerCase() + "%");
-            finalPredicate = cb.and(finalPredicate, filterPredicate);
-          }
-
-          return finalPredicate;
+          // Kết hợp TẤT CẢ: Nằm trong danh sách gợi ý + An toàn + Có quyền xem
+          return cb.and(idInRecommendation, authorInNetwork, visibilityCondition, accessControl);
         };
 
+    // 3. Query DB kèm theo Pagination (Tránh bị hụt trang)
     Page<Post> postPage = postRepository.findAll(spec, pageable);
-    return buildPageVO(postPage, currentUserId);
+
+    // 4. (Tùy chọn) Sắp xếp lại thứ tự bài viết theo đúng thứ tự mảng recommendedPostIds trả về từ
+    // AI
+    List<Post> sortedPosts =
+        postPage.getContent().stream()
+            .sorted(Comparator.comparingInt(p -> recommendedPostIds.indexOf(p.getId())))
+            .toList();
+
+    Page<Post> finalPage =
+        new org.springframework.data.domain.PageImpl<>(
+            sortedPosts, pageable, postPage.getTotalElements());
+
+    return buildPageVO(finalPage, currentUserId);
   }
 
   @Override
@@ -233,7 +247,7 @@ public class PostServiceImpl implements PostService {
   public PageVO<PostResponse> getUserPosts(Long targetUserId, Pageable pageable) {
     Long currentUserId = getCurrentUserId();
 
-    // Gọi user-service để check xem có phải bạn bè không
+    // Call user-service to check if current user is friend with target user
     boolean isFriend = userServiceClient.isFriend(currentUserId, targetUserId);
     boolean isSelf = currentUserId.equals(targetUserId);
 
@@ -391,6 +405,17 @@ public class PostServiceImpl implements PostService {
 
   private boolean isVideo(String ext) {
     return List.of("mp4", "webm", "ogg", "mov", "quicktime").contains(ext.toLowerCase());
+  }
+
+  private PageVO<PostResponse> buildEmptyPage(Pageable pageable) {
+    return PageVO.<PostResponse>builder()
+        .page(pageable.getPageNumber())
+        .size(pageable.getPageSize())
+        .totalElements(0L)
+        .totalPages(0)
+        .numberOfElements(0)
+        .content(List.of())
+        .build();
   }
 
   private PageVO<PostResponse> buildPageVO(Page<Post> postPage, Long currentUserId) {

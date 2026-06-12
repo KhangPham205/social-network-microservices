@@ -332,7 +332,7 @@ public class UserServiceImpl implements UserService {
     if (filter != null && !filter.isBlank()) {
       spec = RSQLJPASupport.toSpecification(filter);
     }
-    
+
     if (spec == null) {
       spec = (root, query, cb) -> cb.conjunction();
     }
@@ -405,6 +405,42 @@ public class UserServiceImpl implements UserService {
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
     return mapToRelationDto(current, target);
+  }
+
+  @Override
+  public List<UserRelationDto> getRelationsWithUsers(List<Long> targetIds) {
+    Long viewerId = getCurrentUser().getId();
+    List<User> targets = userRepository.findAllById(targetIds);
+    Map<Long, UserRelationDto> relationDtos = mapPageToRelationDtos(viewerId, targets);
+
+    return targets.stream()
+        .map(
+            u -> {
+              UserRelationDto dto = relationDtos.get(u.getId());
+              if (dto == null) {
+                dto =
+                    UserRelationDto.builder()
+                        .id(u.getId())
+                        .displayName(u.getDisplayName())
+                        .avatarUrl(u.getAvatarUrl())
+                        .bio(u.getUserInfo() != null ? u.getUserInfo().getBio() : null)
+                        .favorites(u.getUserInfo() != null ? u.getUserInfo().getFavorites() : null)
+                        .dateOfBirth(
+                            u.getUserInfo() != null ? u.getUserInfo().getDateOfBirth() : null)
+                        .joinedAt(u.getCreatedAt())
+                        .isFollowing(false)
+                        .isFollowedBy(false)
+                        .friendship(
+                            FriendshipResponse.builder()
+                                .status(FriendshipStatus.NONE)
+                                .senderId(viewerId)
+                                .receiverId(u.getId())
+                                .build())
+                        .build();
+              }
+              return dto;
+            })
+        .toList();
   }
 
   @Override

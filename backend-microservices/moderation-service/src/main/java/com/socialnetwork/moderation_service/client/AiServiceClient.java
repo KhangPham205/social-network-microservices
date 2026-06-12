@@ -8,7 +8,7 @@ import org.springframework.web.service.annotation.PostExchange;
 
 @HttpExchange("/moderate")
 public interface AiServiceClient {
-    
-    @PostExchange
-    AiModerationResponse checkToxicity(@RequestBody AiModerationRequest request);
+
+  @PostExchange
+  AiModerationResponse checkToxicity(@RequestBody AiModerationRequest request);
 }

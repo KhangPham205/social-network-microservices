@@ -1,5 +1,8 @@
 package com.socialnetwork.moderation_service.listener;
 
+import com.socialnetwork.moderation_service.client.AiServiceClient;
+import com.socialnetwork.moderation_service.dto.AiModerationRequest;
+import com.socialnetwork.moderation_service.dto.AiModerationResponse;
 import com.socialnetwork.moderation_service.enums.ReportReason;
 import com.socialnetwork.moderation_service.enums.ReportStatus;
 import com.socialnetwork.moderation_service.event.ContentCreatedEvent;
@@ -19,6 +22,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 import vo.TargetType;
 
 /**
@@ -33,45 +37,39 @@ public class ContentModerationListener {
   private final ModerationLogRepository moderationLogRepository;
   private final ReportRepository reportRepository;
   private final ModerationService moderationService;
+  private final ObjectMapper objectMapper;
+  private final AiServiceClient aiServiceClient;
 
   /** Handle content creation events via Kafka */
   @Async
-  @KafkaListener(topics = "content-created", groupId = "moderation-service-group")
+  @KafkaListener(topics = "content-created-topic", groupId = "moderation-service-group")
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public void handleContentCreationViaKafka(ContentCreatedEvent event) {
-    log.info(
-        "🤖 Moderation: Processing content [{}] ID: {}",
-        event.getTargetType(),
-        event.getTargetId());
-
+  public void handleContentCreationViaKafka(String payload) {
     try {
-      // A. Check text content for toxicity
-      String textToCheck = event.getContent();
-      if (textToCheck != null && !textToCheck.isBlank()) {
-        boolean isToxic = performTextModeration(textToCheck);
-        if (isToxic) {
-          log.warn("❌ Toxic content detected");
-          handleToxicContent(event);
-          return;
-        }
-      }
+      ContentCreatedEvent event = objectMapper.readValue(payload, ContentCreatedEvent.class);
+      log.info(
+          "🤖 Moderation: Processing content [{}] ID: {}",
+          event.getTargetType(),
+          event.getTargetId());
 
-      // B. Check media (images, etc.)
-      if (event.getMedia() != null && !event.getMedia().isEmpty()) {
-        for (Map<String, String> mediaItem : event.getMedia()) {
-          String url = mediaItem.get("url");
-          if (isImage(url)) {
-            boolean imageIsToxic = performImageModeration(url);
-            if (imageIsToxic) {
-              log.warn("❌ Toxic image detected: {}", url);
-              handleToxicContent(event);
-              return;
-            }
-          }
-        }
-      }
+      AiModerationRequest aiRequest =
+          AiModerationRequest.builder().text(event.getContent()).media(event.getMedia()).build();
 
-      log.info("✅ Content [{} - {}] passed moderation", event.getTargetType(), event.getTargetId());
+      AiModerationResponse aiResponse = aiServiceClient.checkToxicity(aiRequest);
+      log.info(
+          "AI evaluation for {} {}: isToxic={}, reason={}",
+          event.getTargetType(),
+          event.getTargetId(),
+          aiResponse.isToxic(),
+          aiResponse.getReason());
+
+      if (aiResponse.isToxic()) {
+        log.warn("❌ Toxic content detected: {}", aiResponse.getReason());
+        handleToxicContent(event, aiResponse.getReason());
+      } else {
+        log.info(
+            "✅ Content [{} - {}] passed moderation", event.getTargetType(), event.getTargetId());
+      }
 
     } catch (Exception e) {
       log.error("❌ Error during content moderation: {}", e.getMessage(), e);
@@ -83,35 +81,35 @@ public class ContentModerationListener {
   @KafkaListener(topics = "message-created", groupId = "moderation-service-group")
   public void handleMessageSentEvent(MessageSentEvent event) {
     log.info("🤖 Moderation: Processing message ID: {}", event.getId());
-    boolean isToxic = false;
-    String reason = null;
 
     try {
-      // Check text content
-      if (event.getContent() != null && !event.getContent().isBlank()) {
-        if (performTextModeration(event.getContent())) {
-          isToxic = true;
-          reason = "Toxic message content detected";
-        }
+      // Map MessageSentEvent.media (List<Map<String, Object>>) to List<Map<String, String>>
+      List<Map<String, String>> mediaList = null;
+      if (event.getMedia() != null) {
+        mediaList =
+            event.getMedia().stream()
+                .map(
+                    m -> {
+                      Map<String, String> map = new java.util.HashMap<>();
+                      for (Map.Entry<String, Object> entry : m.entrySet()) {
+                        map.put(
+                            entry.getKey(),
+                            entry.getValue() != null ? entry.getValue().toString() : "");
+                      }
+                      return map;
+                    })
+                .collect(java.util.stream.Collectors.toList());
       }
 
-      // Check media if text is clean
-      if (!isToxic && event.getMedia() != null && !event.getMedia().isEmpty()) {
-        for (Map<String, Object> mediaItem : event.getMedia()) {
-          String url = (String) mediaItem.get("url");
-          if (isImage(url) && performImageModeration(url)) {
-            isToxic = true;
-            reason = "Toxic image in message detected";
-            break;
-          }
-        }
-      }
+      AiModerationRequest aiRequest =
+          AiModerationRequest.builder().text(event.getContent()).media(mediaList).build();
 
-      // Handle result
-      if (isToxic) {
-        log.warn("❌ Banning message {}: {}", event.getId(), reason);
+      AiModerationResponse aiResponse = aiServiceClient.checkToxicity(aiRequest);
+
+      if (aiResponse.isToxic()) {
+        log.warn("❌ Banning message {}: {}", event.getId(), aiResponse.getReason());
         moderationService.blockContent(event.getId(), TargetType.MESSAGE);
-        saveModerationLog(TargetType.MESSAGE, event.getId(), reason);
+        saveModerationLog(TargetType.MESSAGE, event.getId(), aiResponse.getReason());
       } else {
         log.info("✅ Message {} is clean", event.getId());
       }
@@ -121,36 +119,18 @@ public class ContentModerationListener {
     }
   }
 
-  /** Placeholder for text moderation - replace with real AI service call */
-  private boolean performTextModeration(String content) {
-    // TODO: Integrate with external AI service
-    if (content == null || content.isBlank()) {
-      return false;
-    }
-    // Simple pattern check (replace with real AI service)
-    String lowerContent = content.toLowerCase();
-    List<String> badWords = List.of("spam", "abuse", "hate");
-    return badWords.stream().anyMatch(lowerContent::contains);
-  }
-
-  /** Placeholder for image moderation */
-  private boolean performImageModeration(String url) {
-    // TODO: Integrate with AI image analysis service
-    return false;
-  }
-
   /** Handle toxic content - create report and log moderation */
-  private void handleToxicContent(ContentCreatedEvent event) {
+  private void handleToxicContent(ContentCreatedEvent event, String reason) {
     try {
       createSystemReportForContent(
           event.getTargetId().toString(),
           event.getTargetType(),
           event.getAuthorId(),
-          "Auto-detected toxic content");
+          "Auto-detected toxic content: " + reason);
       saveModerationLog(
           event.getTargetType(),
           event.getTargetId().toString(),
-          "Auto-banned due to toxic content");
+          "Auto-banned due to toxic content: " + reason);
       moderationService.blockContent(event.getTargetId().toString(), event.getTargetType());
       log.info("🚫 Auto-banned {} ID: {}", event.getTargetType(), event.getTargetId());
     } catch (Exception e) {
@@ -168,7 +148,7 @@ public class ContentModerationListener {
       if (!exists) {
         Report report =
             Report.builder()
-                .reporterId(null)
+                .reporterId(-1L) // -1L represents the System/Bot
                 .targetId(targetId)
                 .targetType(type)
                 .targetUserId(targetUserId)
@@ -201,15 +181,5 @@ public class ContentModerationListener {
     } catch (Exception e) {
       log.error("Error saving moderation log: {}", e.getMessage());
     }
-  }
-
-  private boolean isImage(String url) {
-    if (url == null) return false;
-    String lower = url.toLowerCase();
-    return lower.endsWith(".jpg")
-        || lower.endsWith(".jpeg")
-        || lower.endsWith(".png")
-        || lower.endsWith(".webp")
-        || lower.endsWith(".bmp");
   }
 }

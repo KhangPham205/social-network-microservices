@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class ModerationActionEvent {
-    private String targetId;
-    private String targetType;
-    private String action; // e.g., "BLOCK"
+  private String targetId;
+  private String targetType;
+  private String action; // e.g., "BLOCK"
 }

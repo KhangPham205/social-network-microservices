@@ -40,6 +40,8 @@ public interface UserService {
 
   UserRelationDto getRelationWithUser(Long id);
 
+  List<UserRelationDto> getRelationsWithUsers(List<Long> targetIds);
+
   UserModerationDto getUserForModeration(Long id);
 
   List<UserModerationDto> getUsersByIds(List<Long> ids);

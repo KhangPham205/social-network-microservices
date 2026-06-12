@@ -28,7 +28,8 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
-                    .requestMatchers("/api/v1/users/internal/**", "/error")
+                    .requestMatchers(
+                        "/api/v1/users/internal/**", "/api/v1/users/neo4j/**", "/error")
                     .permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**")
                     .permitAll()

@@ -54,4 +54,7 @@ public interface FriendshipRepository
           + "(f.sender.id = :user2 AND f.receiver.id = :user1)) "
           + "AND f.status = 'FRIEND'")
   boolean existsActiveFriendship(@Param("user1") Long user1, @Param("user2") Long user2);
+
+  @Query("SELECT f FROM Friendship f JOIN FETCH f.sender JOIN FETCH f.receiver")
+  List<Friendship> findAllWithUsers();
 }

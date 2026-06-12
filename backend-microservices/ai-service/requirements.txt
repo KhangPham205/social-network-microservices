@@ -12,3 +12,4 @@ sentencepiece
 protobuf
 torch
 torchvision
+requests

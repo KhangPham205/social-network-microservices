@@ -25,9 +25,7 @@ public class KafkaProducerConfig {
     props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
     props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JacksonJsonSerializer.class);
-    props.put(
-        JacksonJsonDeserializer.TYPE_MAPPINGS,
-        "contentCreated:events.ContentCreatedEvent");
+    props.put(JacksonJsonDeserializer.TYPE_MAPPINGS, "contentCreated:events.ContentCreatedEvent");
 
     return new DefaultKafkaProducerFactory<>(props);
   }

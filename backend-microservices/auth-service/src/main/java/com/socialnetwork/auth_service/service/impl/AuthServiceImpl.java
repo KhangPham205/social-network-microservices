@@ -254,8 +254,10 @@ public class AuthServiceImpl implements AuthService {
   @Override
   @Transactional(readOnly = true)
   public AuthCredentialDto getCredentialById(Long id) {
-    UserCredential credential = userCredentialRepository.findById(id)
-        .orElseThrow(() -> new ResourceNotFoundException("Credential not found for ID: " + id));
+    UserCredential credential =
+        userCredentialRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Credential not found for ID: " + id));
 
     return mapToCredentialDto(credential);
   }
@@ -265,17 +267,16 @@ public class AuthServiceImpl implements AuthService {
   public List<AuthCredentialDto> getCredentialsByIds(List<Long> ids) {
     List<UserCredential> credentials = userCredentialRepository.findAllById(ids);
 
-    return credentials.stream()
-        .map(this::mapToCredentialDto)
-        .toList();
+    return credentials.stream().map(this::mapToCredentialDto).toList();
   }
 
   // --------------------- Helper methods --------------------------
   private AuthCredentialDto mapToCredentialDto(UserCredential credential) {
     // Rút trích tên các Role từ Set<Role> của Entity
-    Set<String> roleNames = credential.getRoles().stream()
-        .map(Role::getName) // Lấy ra cái tên (VD: "USER", "ADMIN")
-        .collect(Collectors.toSet());
+    Set<String> roleNames =
+        credential.getRoles().stream()
+            .map(Role::getName) // Lấy ra cái tên (VD: "USER", "ADMIN")
+            .collect(Collectors.toSet());
 
     return AuthCredentialDto.builder()
         .id(credential.getId())
