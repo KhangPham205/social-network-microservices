@@ -1,9 +1,17 @@
 server:
   port: 8080
+  tomcat:
+    threads:
+      max: 600 # Tăng số luồng xử lý đồng thời lên 600 (mặc định 200)
+      accept-count: 200 # Tăng hàng đợi
 
 spring:
   application:
     name: api-gateway
+  datasource:
+    hikari:
+      maximum-pool-size: 50 # Tăng số lượng kết nối DB đồng thời (mặc định 10)
+      minimum-idle: 10
 
 eureka:
   client:

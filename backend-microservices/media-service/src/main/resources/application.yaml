@@ -1,5 +1,9 @@
 server:
   port: 8083 # Port riêng cho Media Service
+  tomcat:
+    threads:
+      max: 600 # Tăng số luồng xử lý đồng thời lên 600 (mặc định 200)
+      accept-count: 200 # Tăng hàng đợi
 
 spring:
   application:

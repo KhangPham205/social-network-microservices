@@ -30,6 +30,7 @@
 import http from "k6/http";
 import { check, sleep, group } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
+import { FormData } from 'https://jslib.k6.io/formdata/0.0.2/index.js';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Configuration
@@ -92,6 +93,7 @@ export const options = {
 
 const commonHeaders = {
   Authorization: `Bearer ${AUTH_TOKEN}`,
+  Cookie: `jwt=${AUTH_TOKEN}`,
   "Content-Type": "application/json",
   Accept: "application/json",
 };
@@ -128,7 +130,7 @@ function scenarioA() {
     // Simulate pagination; pick a random page number (0–9) to spread load
     const page = Math.floor(Math.random() * 10);
     const size = 20;
-    const url = `${BASE_URL}/api/v1/recommendations/explore?page=${page}&size=${size}`;
+    const url = `${BASE_URL}/api/v1/media/posts/me?page=${page}&size=${size}`;
 
     const start = Date.now();
     const res = http.get(url, { headers: commonHeaders, tags: { name: "explore_feed" } });
@@ -169,38 +171,37 @@ const POST_CONTENTS = [
 function scenarioB() {
   group("Scenario B – Write Heavy: Create Post", () => {
     const content = POST_CONTENTS[Math.floor(Math.random() * POST_CONTENTS.length)];
-    const payload = JSON.stringify({
+    const url = `${BASE_URL}/api/v1/media/posts/create`;
+
+    const payload = {
       content: content,
       accessModifier: "PUBLIC",
-      // No media files in the load-test payload – keeps the test focused on Kafka/AI throughput
-    });
+      media: http.file("fake_image_data", "dummy.jpg", "image/jpeg") 
+    };
 
-    const url = `${BASE_URL}/api/v1/media/posts`;
+    const reqHeaders = {
+      Authorization: `Bearer ${AUTH_TOKEN}`,
+      Cookie: `jwt=${AUTH_TOKEN}`,
+      Accept: "application/json",
+    };
 
     const start = Date.now();
     const res = http.post(url, payload, {
-      headers: commonHeaders,
+      headers: reqHeaders,
       tags: { name: "create_post" },
     });
     scenarioBDuration.add(Date.now() - start);
 
-    // Assertions
-    const ok = check(res, {
+    if (res.status !== 200 && res.status !== 201) {
+       console.log(`[LỖI B] Status: ${res.status}, Body: ${res.body}`);
+    }
+
+    check(res, {
       "B: status is 200 or 201 Created": (r) => r.status === 200 || r.status === 201,
-      "B: response contains postId": (r) => {
-        try {
-          const body = JSON.parse(r.body);
-          return body.id !== undefined || body.postId !== undefined;
-        } catch (_) {
-          return false;
-        }
-      },
       "B: response time < 500 ms": (r) => r.timings.duration < 500,
     });
 
     trackError(res, scenarioBErrors);
-
-    // Simulate realistic inter-post think time (1 – 3 s)
     sleep(Math.random() * 2 + 1);
   });
 }

@@ -47,6 +47,7 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
 		<!-- reactor-test provides StepVerifier and WebTestClient support -->
 		<dependency>
 			<groupId>io.projectreactor</groupId>
