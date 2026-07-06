@@ -1,0 +1,229 @@
+package com.socialnetwork.chat_service.service.impl;
+
+import com.socialnetwork.chat_service.client.UserClient;
+import com.socialnetwork.chat_service.dto.MessageRequest;
+import com.socialnetwork.chat_service.dto.MessageResponse;
+import com.socialnetwork.chat_service.dto.UserProfileDto;
+import com.socialnetwork.chat_service.enums.MessageType;
+import com.socialnetwork.chat_service.event.MessageNotificationEvent;
+import com.socialnetwork.chat_service.model.ChatMessage;
+import com.socialnetwork.chat_service.model.ChatRoom;
+import com.socialnetwork.chat_service.repository.jpa.ChatRoomRepository;
+import com.socialnetwork.chat_service.repository.jpa.RoomMemberRepository;
+import com.socialnetwork.chat_service.repository.mongo.ChatMessageRepository;
+import com.socialnetwork.chat_service.service.MessageService;
+import exception.AccessDeniedException;
+import exception.ResourceNotFoundException;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import vo.CursorPage;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class MessageServiceImpl implements MessageService {
+
+  private final ChatMessageRepository chatMessageRepository;
+  private final ChatRoomRepository chatRoomRepository;
+  private final RoomMemberRepository roomMemberRepository;
+
+  private final SimpMessagingTemplate messagingTemplate;
+  private final UserClient userClient;
+  private final KafkaTemplate<String, Object> kafkaTemplate;
+
+  private Long getCurrentUserId() {
+    String userIdStr =
+        (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    return Long.parseLong(userIdStr);
+  }
+
+  @Override
+  public Map<String, Object> sendMessage(MessageRequest req) {
+    Long senderId = getCurrentUserId();
+    return createAndSaveMessage(senderId, req);
+  }
+
+  @Override
+  public void sendMessageAs(Long senderId, MessageRequest req) {
+    createAndSaveMessage(senderId, req);
+  }
+
+  private Map<String, Object> createAndSaveMessage(Long senderId, MessageRequest req) {
+    log.info("STEP 1 - start create message");
+    log.info("senderId={}", senderId);
+    log.info("conversationId={}", req.getConversationId());
+    log.info("content={}", req.getContent());
+
+    UserProfileDto senderProfile = userClient.getUserProfile(senderId);
+    log.info("STEP 2 - got user profile {}", senderProfile.getDisplayName());
+
+    ChatRoom room =
+        chatRoomRepository
+            .findById(req.getConversationId())
+            .orElseThrow(() -> new RuntimeException("Room not found"));
+
+    log.info("STEP 3 - found room {}", room.getId());
+
+    ChatMessage message =
+        ChatMessage.builder()
+            .roomId(room.getId())
+            .senderId(senderId)
+            .senderName(senderProfile.getDisplayName())
+            .senderAvatar(senderProfile.getAvatarUrl())
+            .content(req.getContent())
+            .type(
+                (req.getContent() != null && !req.getContent().isBlank())
+                    ? MessageType.TEXT
+                    : MessageType.FILE)
+            .createdAt(Instant.now())
+            .readBy(List.of(senderId))
+            .isDeleted(false)
+            .build();
+
+    log.info("STEP 4 - before mongo save");
+
+    ChatMessage saved = chatMessageRepository.save(message);
+
+    messagingTemplate.convertAndSend(
+        "/queue/conversation/" + room.getId(), (Object) convertToMapPayload(saved));
+
+    log.info("STEP 5 - mongo saved id={}", saved.getId());
+
+    return convertToMapPayload(saved);
+  }
+
+  @Override
+  public CursorPage<MessageResponse> getMessagesCursor(
+      Long conversationId, String beforeMessageId, int limit) {
+    Long currentUserId = getCurrentUserId();
+    if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(conversationId, currentUserId)) {
+      throw new AccessDeniedException("Not a member of this room");
+    }
+
+    PageRequest pageRequest = PageRequest.of(0, limit);
+    Slice<ChatMessage> slice;
+
+    if (beforeMessageId != null && !beforeMessageId.isBlank()) {
+      slice =
+          chatMessageRepository.findByRoomIdAndIdLessThanOrderByCreatedAtDesc(
+              conversationId, beforeMessageId, pageRequest);
+    } else {
+      slice = chatMessageRepository.findByRoomIdOrderByCreatedAtDesc(conversationId, pageRequest);
+    }
+
+    List<MessageResponse> content =
+        slice.getContent().stream().map(this::mapToDto).collect(Collectors.toList());
+
+    String nextCursor =
+        slice.hasNext() ? slice.getContent().get(slice.getContent().size() - 1).getId() : null;
+
+    Collections.reverse(content);
+
+    return new CursorPage<>(content, nextCursor);
+  }
+
+  @Override
+  public List<Map<String, Object>> getMessages(Long conversationId) {
+    return chatMessageRepository.findByRoomIdOrderByCreatedAtDesc(conversationId).stream()
+        .map(this::convertToMapPayload)
+        .collect(Collectors.toList());
+  }
+
+  @Override
+  public void softDeleteMessage(String messageId) {
+    Long currentUserId = getCurrentUserId();
+    ChatMessage message =
+        chatMessageRepository
+            .findById(messageId)
+            .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+
+    if (!message.getSenderId().equals(currentUserId)) {
+      throw new AccessDeniedException("You can only delete your own messages");
+    }
+
+    message.setIsDeleted(true);
+    message.setDeletedAt(Instant.now());
+    message.setContent("Tin nhắn đã bị gỡ bỏ");
+    message.setMedia(null);
+
+    chatMessageRepository.save(message);
+
+    // Bắn sự kiện qua Socket để Client thu hồi tin nhắn
+    Map<String, Object> payload =
+        Map.of(
+            "type", "MESSAGE_REVOKED",
+            "id", message.getId(),
+            "conversationId", message.getRoomId());
+    messagingTemplate.convertAndSend(
+        "/topic/conversation/" + message.getRoomId(), (Object) payload);
+  }
+
+  private void publishNotificationEvent(ChatRoom room, UserProfileDto sender, MessageRequest req) {
+    List<Long> recipientIds =
+        roomMemberRepository.findByIdRoomId(room.getId()).stream()
+            .map(rm -> rm.getId().getUserId())
+            .filter(id -> !id.equals(sender.getId()))
+            .collect(Collectors.toList());
+
+    if (recipientIds.isEmpty()) return;
+
+    String preview =
+        (req.getContent() != null && !req.getContent().isEmpty())
+            ? req.getContent()
+            : "Đã gửi 1 tệp đính kèm";
+
+    MessageNotificationEvent event =
+        MessageNotificationEvent.builder()
+            .roomId(room.getId())
+            .senderId(sender.getId())
+            .senderName(sender.getDisplayName())
+            .previewContent(preview)
+            .recipientIds(recipientIds)
+            .build();
+
+    kafkaTemplate.send("chat-notification-topic", event);
+    log.info("Sent notification event to Kafka for room {}", room.getId());
+  }
+
+  private Map<String, Object> convertToMapPayload(ChatMessage msg) {
+    Map<String, Object> map = new HashMap<>();
+    map.put("id", msg.getId());
+    map.put("roomId", msg.getRoomId());
+    map.put("senderId", msg.getSenderId());
+    map.put("senderName", msg.getSenderName());
+    map.put("senderAvatar", msg.getSenderAvatar());
+    map.put("content", msg.getContent());
+    map.put("type", msg.getType() != null ? msg.getType().name() : MessageType.TEXT.name());
+    map.put("media", msg.getMedia());
+    map.put("createdAt", msg.getCreatedAt() != null ? msg.getCreatedAt().toString() : null);
+    map.put("isDeleted", msg.getIsDeleted());
+    return map;
+  }
+
+  private MessageResponse mapToDto(ChatMessage msg) {
+    MessageResponse dto = new MessageResponse();
+    dto.setId(msg.getId());
+    dto.setConversationId(msg.getRoomId());
+    dto.setSenderId(msg.getSenderId());
+    dto.setSenderName(msg.getSenderName());
+    dto.setSenderAvatar(msg.getSenderAvatar());
+    dto.setReplyToId(msg.getReplyToId());
+    dto.setContent(msg.getContent());
+    dto.setMedia(msg.getMedia());
+    dto.setCreatedAt(msg.getCreatedAt());
+    dto.setDeletedAt(msg.getDeletedAt());
+    return dto;
+  }
+}

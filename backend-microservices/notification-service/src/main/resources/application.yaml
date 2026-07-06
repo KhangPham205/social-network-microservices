@@ -1,0 +1,26 @@
+server:
+  port: 8084
+  http2:
+    enabled: true
+  compression:
+    enabled: true
+    min-response-size: 1024
+
+spring:
+  application:
+    name: notification-service
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      enabled: true
+  messages:
+    encoding: UTF-8
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+  server:
+    url: http://localhost:8080 # Trỏ về API Gateway

@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: auth-service
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      enabled: true
+  jackson:
+    deserialization:
+      fail-on-null-for-primitives: false
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method # Sắp xếp các API theo GET, POST, PUT, DELETE cho dễ nhìn
+
+server:
+  port: 8081
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}

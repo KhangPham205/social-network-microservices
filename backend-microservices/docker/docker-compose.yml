@@ -1,0 +1,305 @@
+services:
+  # 1. Database ĐỘC LẬP cho Auth Service (Port 5432)
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: postgres_auth
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: auth_db
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 2. Database ĐỘC LẬP cho User Service (Port 5433)
+  postgres-user:
+    image: postgres:15-alpine
+    container_name: postgres_user
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user_db
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 3. Database ĐỘC LẬP cho Media Service (Port 5434)
+  postgres-media:
+    image: postgres:15-alpine
+    container_name: postgres_media
+    restart: always
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: media_db
+    volumes:
+      - media_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 4. Database ĐỘC LẬP cho Notification Service (Port 5435)
+  postgres-noti:
+    image: postgres:15-alpine
+    container_name: postgres_noti
+    restart: always
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: notification_db
+    volumes:
+      - noti_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 5. Database ĐỘC LẬP cho Chat Service (Port 5436) - QUẢN LÝ PHÒNG CHAT
+  postgres-chat:
+    image: postgres:15-alpine
+    container_name: postgres_chat
+    restart: always
+    ports:
+      - "5436:5432" # Ánh xạ ra cổng 5436
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: chat_db
+    volumes:
+      - chat_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 6. Database ĐỘC LẬP cho Moderation Service (Port 5437)
+  postgres-moderation:
+    image: postgres:15-alpine
+    container_name: postgres_moderation
+    restart: always
+    ports:
+      - "5437:5432" # Khớp với port trong application.yml
+    environment:
+      POSTGRES_USER: postgres  # Khớp với username trong application.yml
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: moderation_db
+    volumes:
+      - moderation_db_data:/var/lib/postgresql/data
+    networks:
+      - social-network-net
+
+  # 7. MongoDB cho Chat Service - LƯU TRỮ TIN NHẮN
+  mongodb:
+    image: mongo:latest
+    container_name: social_network_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - social-network-net
+
+  # 8. Mongo Express - GIAO DIỆN QUẢN LÝ MONGODB (Port 8081)
+  mongo-express:
+    image: mongo-express
+    container_name: social_network_mongo_express
+    ports:
+      - "8090:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password@mongodb:27017/
+
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: password
+    depends_on:
+      - mongodb
+    networks:
+      - social-network-net
+
+  # 9. Redis để Caching (Newsfeed, Like count)
+  redis:
+    image: redis:7.2-alpine
+    container_name: social_network_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - social-network-net
+
+  # 10. Minio để lưu trữ file (Ảnh/Video của Post)
+  minio:
+    image: minio/minio:latest
+    container_name: social_network_minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - social-network-net
+
+  # 11. pgAdmin (Quản lý chung các DB Postgres)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: social_network_pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@social.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      - postgres-auth
+      - postgres-user
+      - postgres-media
+      - postgres-noti
+      - postgres-chat
+      - postgres-moderation
+    networks:
+      - social-network-net
+
+  # 12. Kafka
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: social_network_kafka
+    restart: always
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: EXTERNAL://0.0.0.0:9092,INTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9092,INTERNAL://kafka:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - social-network-net
+
+  # 13. Kafka UI
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: social_network_kafka_ui
+    restart: always
+    ports:
+      - "8888:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local-kraft
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9094
+    depends_on:
+      - kafka
+    networks:
+      - social-network-net
+  ai-service:
+    build: ../ai-service
+    container_name: ai-service
+    ports:
+      - "8000:5000"
+    networks:
+      - social-network-net
+
+  # 14. Neo4j cho Friend Recommendation
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j-social
+    ports:
+      - "7474:7474" # HTTP UI
+      - "7687:7687" # Bolt Protocol
+    environment:
+      - NEO4J_AUTH=neo4j/password
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - social-network-net
+
+  # 15. Etcd (Dependencies for Milvus)
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - milvus_etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - social-network-net
+
+  # 16. Milvus Standalone (Vector DB)
+  milvus-standalone:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.5.3
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY_ID: admin
+      MINIO_SECRET_ACCESS_KEY: password123
+      MINIO_BUCKET_NAME: milvus-bucket
+    volumes:
+      - milvus_data:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - etcd
+      - minio
+    networks:
+      - social-network-net
+
+  # 17. Attu (Giao diện quản lý Milvus)
+  attu:
+    container_name: attu
+    image: zilliz/attu:latest
+    environment:
+      MILVUS_URL: milvus-standalone:19530
+    ports:
+      - "8001:3000"
+    depends_on:
+      - milvus-standalone
+    networks:
+      - social-network-net
+
+# Đã bổ sung đầy đủ ổ cứng ảo
+volumes:
+  auth_db_data:
+  user_db_data:
+  media_db_data:
+  noti_db_data:
+  chat_db_data:
+  moderation_db_data:
+  mongo_data:
+  minio_data:
+  neo4j_data:
+  neo4j_logs:
+  milvus_data:
+  milvus_etcd_data:
+
+networks:
+  social-network-net:
+    driver: bridge

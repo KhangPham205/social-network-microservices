@@ -15,3 +15,9 @@ buildNumber.properties
 .project
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
+backend-microservices/user-service/src/main/resources/application-dev.yaml
+backend-microservices/auth-service/src/main/resources/application-dev.yaml
+backend-microservices/auth-service/src/main/resources/application-dev.yaml
+backend-microservices/notification-service/src/main/resources/application-dev.yaml
+backend-microservices/media-service/src/main/resources/application-dev.yaml
+backend-microservices/chat-service/src/main/resources/application-dev.yaml
