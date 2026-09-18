@@ -1,15 +1,31 @@
 package com.socialnetwork.auth_service.model;
 
-import com.socialnetwork.auth_service.enums.AccountStatus;
-import jakarta.persistence.*;
+import com.socialnetwork.common.vo.AccountStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "user_credential")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -28,29 +44,28 @@ public class UserCredential {
   @Column(unique = true)
   private String email;
 
-  //    @Column(unique = true)
-  //    private String phone;
-
-  //    @ManyToOne
-  //    @JoinColumn(name = "role_id", nullable = false)
-  //    private Role role;
-
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
+  @Builder.Default
   private AccountStatus status = AccountStatus.PENDING;
 
-  private String verificationCode; // mã xác thực email
+  /** Pending e-mail verification OTP; null when none is outstanding. */
+  private String verificationCode;
 
-  private Instant verificationCodeExpiry; // thời gian hết hạn mã xác thực
+  private Instant verificationCodeExpiry;
+
+  /** Wrong codes submitted for the current verification OTP (nullable for legacy rows). */
+  private Integer verificationAttempts;
 
   @ManyToMany(fetch = FetchType.EAGER)
   @JoinTable(
       name = "user_roles",
       joinColumns = @JoinColumn(name = "user_id"),
       inverseJoinColumns = @JoinColumn(name = "role_id"))
+  @Builder.Default
   private Set<Role> roles = new HashSet<>();
 
-  // Quan hệ 1-1 với bảng User (thông tin cá nhân)
-  //    @OneToOne(mappedBy = "credential")
-  //    private User user;
+  public int getVerificationAttempts() {
+    return verificationAttempts == null ? 0 : verificationAttempts;
+  }
 }

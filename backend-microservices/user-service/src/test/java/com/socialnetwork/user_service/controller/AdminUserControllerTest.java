@@ -27,10 +27,10 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import security.JwtAuthenticationFilter;
+import com.socialnetwork.common.security.JwtAuthenticationFilter;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import vo.PageVO;
+import com.socialnetwork.common.vo.PageVO;
 
 /**
  * Tests for {@link AdminUserController} – specifically the API Composition logic in {@code

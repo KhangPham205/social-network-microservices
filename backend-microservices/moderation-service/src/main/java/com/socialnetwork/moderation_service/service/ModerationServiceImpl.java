@@ -1,4 +1,5 @@
 package com.socialnetwork.moderation_service.service;
+import com.socialnetwork.common.vo.ModerationAction;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socialnetwork.moderation_service.client.AuthClient;
@@ -18,10 +19,10 @@ import com.socialnetwork.moderation_service.model.Report;
 import com.socialnetwork.moderation_service.repository.ComplaintRepository;
 import com.socialnetwork.moderation_service.repository.ModerationLogRepository;
 import com.socialnetwork.moderation_service.repository.ReportRepository;
-import dto.IdCount;
-import events.ModerationActionEvent;
-import exception.BadRequestException;
-import exception.ResourceNotFoundException;
+import com.socialnetwork.common.dto.IdCount;
+import com.socialnetwork.common.events.ModerationActionEvent;
+import com.socialnetwork.common.exception.BadRequestException;
+import com.socialnetwork.common.exception.ResourceNotFoundException;
 import io.github.perplexhub.rsql.RSQLJPASupport;
 import java.time.Instant;
 import java.util.*;
@@ -37,8 +38,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import vo.PageVO;
-import vo.TargetType;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.TargetType;
 
 @Slf4j
 @Service
@@ -323,7 +324,7 @@ public class ModerationServiceImpl implements ModerationService {
   public void blockContent(String idStr, TargetType targetType) {
     Long adminId = getCurrentAdminIdSafely();
 
-    ModerationActionEvent event = new ModerationActionEvent(idStr, targetType.name(), "BLOCK");
+    ModerationActionEvent event = new ModerationActionEvent(idStr, targetType, ModerationAction.BLOCK, "Admin blocked content");
     kafkaTemplate.send("moderation-actions", idStr, event);
 
     saveLog(adminId, targetType, idStr, "BLOCK", "Admin blocked content");

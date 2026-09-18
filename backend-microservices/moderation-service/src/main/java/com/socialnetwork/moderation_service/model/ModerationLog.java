@@ -1,18 +1,18 @@
 package com.socialnetwork.moderation_service.model;
 
-import entity.BaseEntity;
+import com.socialnetwork.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
-@EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "moderation_logs")
-@Data
+@Getter
+@Setter
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor

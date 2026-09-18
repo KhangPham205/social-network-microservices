@@ -1,16 +1,13 @@
 package com.socialnetwork.notification_service.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
-import lombok.Builder;
-import lombok.Data;
 
-@Data
-@Builder
-public class NotificationDto {
-  private Long id;
-  private ActorDto actor;
-  private String content;
-  private String link;
-  private boolean isRead;
-  private Instant createdAt;
-}
+/** Notification as seen by the client (REST list and STOMP push share this shape). */
+public record NotificationDto(
+    Long id,
+    ActorDto actor,
+    String content,
+    String link,
+    @JsonProperty("isRead") boolean read,
+    Instant createdAt) {}

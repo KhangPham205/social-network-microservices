@@ -1,51 +1,41 @@
 package com.socialnetwork.notification_service.config;
 
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.security.JwtSecurityConfigurer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import security.EnableCommonSecurity;
-import security.JwtAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
-@EnableCommonSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-  private final JwtAuthenticationFilter jwtAuthFilter;
+  private final JwtSecurityConfigurer jwtSecurity;
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http.csrf(AbstractHttpConfigurer::disable)
-        .cors(AbstractHttpConfigurer::disable)
-        .sessionManagement(
-            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    jwtSecurity
+        .apply(http)
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
-                    .requestMatchers(
-                        "/v3/api-docs/**",
-                        "/swagger-ui/**",
-                        "/swagger-ui.html",
-                        "/aggregate/**",
-                        "/error")
+                    .requestMatchers(ApiConstants.SWAGGER_WHITELIST)
                     .permitAll()
-                    .requestMatchers("/ws/**")
+                    .requestMatchers("/error", "/actuator/health/**")
                     .permitAll()
-                    .requestMatchers("/api/v1/notifications/**")
-                    .authenticated()
+                    // The STOMP handshake authenticates itself (JwtHandshakeInterceptor).
+                    .requestMatchers(ApiConstants.WEBSOCKET + "/**")
+                    .permitAll()
                     .anyRequest()
-                    .authenticated())
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
+                    .authenticated());
     return http.build();
   }
 }

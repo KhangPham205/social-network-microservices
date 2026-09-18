@@ -2,7 +2,7 @@ package com.socialnetwork.moderation_service.dto;
 
 import com.socialnetwork.moderation_service.enums.ReportReason;
 import lombok.Data;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 @Data
 public class CreateReportRequest {

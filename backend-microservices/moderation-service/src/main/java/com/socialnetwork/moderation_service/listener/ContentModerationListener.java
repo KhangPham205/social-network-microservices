@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 /**
  * ContentModerationListener - Listens for content creation events from Kafka and performs AI-based

@@ -1,7 +1,7 @@
 package com.socialnetwork.media_service.dto.react;
 
 import lombok.*;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 @Data
 @NoArgsConstructor

@@ -4,14 +4,14 @@ package com.socialnetwork.chat_service.controller;
 import com.socialnetwork.chat_service.dto.MessageRequest;
 import com.socialnetwork.chat_service.dto.MessageResponse;
 import com.socialnetwork.chat_service.service.MessageService;
-import constants.ApiConstants;
+import com.socialnetwork.common.constants.ApiConstants;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import vo.CursorPage;
+import com.socialnetwork.common.vo.CursorPage;
 
 @RestController
 @RequestMapping(ApiConstants.MESSAGES)

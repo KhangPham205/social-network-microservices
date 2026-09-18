@@ -1,4 +1,5 @@
 package com.socialnetwork.user_service.service.impl;
+import com.socialnetwork.common.vo.NotificationType;
 
 import com.socialnetwork.user_service.dto.FriendshipResponse;
 import com.socialnetwork.user_service.dto.UserRelationDto;
@@ -11,9 +12,9 @@ import com.socialnetwork.user_service.repository.UserRelaRepository;
 import com.socialnetwork.user_service.repository.UserRepository;
 import com.socialnetwork.user_service.service.FriendshipService;
 import com.socialnetwork.user_service.utils.BlockUtils;
-import exception.AccessDeniedException;
-import exception.BadRequestException;
-import exception.ResourceNotFoundException;
+import com.socialnetwork.common.exception.AccessDeniedException;
+import com.socialnetwork.common.exception.BadRequestException;
+import com.socialnetwork.common.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import java.util.*;
 import java.util.function.Function;
@@ -25,8 +26,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import vo.PageVO;
-import vo.friendship.FriendshipStatus;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.FriendshipStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -86,7 +87,7 @@ public class FriendshipServiceImpl implements FriendshipService {
         targetId, // receiverId (Người nhận)
         null, // postId (Không có)
         null, // targetId phụ (Không có)
-        "FRIEND_REQUEST" // Type
+        NotificationType.FRIEND_REQUEST
         );
 
     return new FriendshipResponse(
@@ -119,7 +120,7 @@ public class FriendshipServiceImpl implements FriendshipService {
         senderId, // receiverId (Người nhận được thông báo)
         null,
         null,
-        "FRIEND_ACCEPT");
+        NotificationType.FRIEND_ACCEPT);
 
     eventPublisher.publishFriendshipAcceptedEvent(senderId, receiverId);
 

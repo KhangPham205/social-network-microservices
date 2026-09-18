@@ -8,17 +8,18 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
+/** Builds the HTTP-interface proxies on top of the load-balanced {@link RestClient.Builder}. */
 @Configuration
 public class HttpInterfaceConfig {
 
-  // Nhờ Spring tiêm đúng cái "microserviceBuilder" từ bên RestClientConfig sang đây
+  private static final String USER_SERVICE_URL = "http://user-service";
+
   @Bean
   public UserServiceClient userServiceClient(
-      @Qualifier("microserviceBuilder") RestClient.Builder builder) {
-    RestClient restClient = builder.baseUrl("http://user-service").build();
-    RestClientAdapter adapter = RestClientAdapter.create(restClient);
-    HttpServiceProxyFactory factory = HttpServiceProxyFactory.builderFor(adapter).build();
-
-    return factory.createClient(UserServiceClient.class);
+      @Qualifier(RestClientConfig.LOAD_BALANCED_BUILDER) RestClient.Builder builder) {
+    RestClient restClient = builder.clone().baseUrl(USER_SERVICE_URL).build();
+    return HttpServiceProxyFactory.builderFor(RestClientAdapter.create(restClient))
+        .build()
+        .createClient(UserServiceClient.class);
   }
 }

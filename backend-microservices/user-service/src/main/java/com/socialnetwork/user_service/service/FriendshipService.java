@@ -4,7 +4,7 @@ import com.socialnetwork.user_service.dto.FriendshipResponse;
 import com.socialnetwork.user_service.dto.UserRelationDto;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
-import vo.PageVO;
+import com.socialnetwork.common.vo.PageVO;
 
 public interface FriendshipService {
   FriendshipResponse sendRequest(Long userId, Long targetId);

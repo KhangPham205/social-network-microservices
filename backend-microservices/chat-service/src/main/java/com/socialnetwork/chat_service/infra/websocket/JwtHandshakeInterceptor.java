@@ -10,7 +10,7 @@ import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
-import security.JwtValidator; // Từ module common
+import com.socialnetwork.common.security.JwtValidator; // Từ module common
 
 @Component
 @Slf4j

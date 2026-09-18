@@ -1,15 +1,15 @@
 package com.socialnetwork.user_service.model;
 
-import entity.BaseEntity;
+import com.socialnetwork.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import vo.friendship.FriendshipStatus;
+import com.socialnetwork.common.vo.FriendshipStatus;
 
-@EqualsAndHashCode(callSuper = true)
 @Entity
 @Table(name = "friendship")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder

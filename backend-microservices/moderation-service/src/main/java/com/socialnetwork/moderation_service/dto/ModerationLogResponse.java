@@ -3,7 +3,7 @@ package com.socialnetwork.moderation_service.dto;
 import java.time.Instant;
 import lombok.Builder;
 import lombok.Data;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 @Data
 @Builder

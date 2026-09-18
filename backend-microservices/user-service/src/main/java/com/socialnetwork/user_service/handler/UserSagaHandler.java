@@ -1,9 +1,9 @@
 package com.socialnetwork.user_service.handler;
 
 import com.socialnetwork.user_service.service.UserService;
-import events.ProfileCreatedEvent;
-import events.ProfileFailedEvent;
-import events.UserCreatedEvent;
+import com.socialnetwork.common.events.ProfileCreatedEvent;
+import com.socialnetwork.common.events.ProfileFailedEvent;
+import com.socialnetwork.common.events.UserCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;

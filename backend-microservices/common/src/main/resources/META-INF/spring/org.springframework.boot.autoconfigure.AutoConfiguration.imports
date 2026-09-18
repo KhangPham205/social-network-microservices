@@ -1,0 +1,3 @@
+com.socialnetwork.common.config.CommonWebAutoConfiguration
+com.socialnetwork.common.config.CommonSecurityAutoConfiguration
+com.socialnetwork.common.config.CommonJpaAuditingAutoConfiguration

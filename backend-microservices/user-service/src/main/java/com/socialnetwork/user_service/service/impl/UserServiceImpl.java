@@ -10,7 +10,7 @@ import com.socialnetwork.user_service.repository.FriendshipRepository;
 import com.socialnetwork.user_service.repository.UserRelaRepository;
 import com.socialnetwork.user_service.repository.UserRepository;
 import com.socialnetwork.user_service.service.UserService;
-import exception.ResourceNotFoundException;
+import com.socialnetwork.common.exception.ResourceNotFoundException;
 import io.github.perplexhub.rsql.RSQLJPASupport;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Root;
@@ -26,9 +26,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import utils.SecurityUtils;
-import vo.PageVO;
-import vo.friendship.FriendshipStatus;
+import com.socialnetwork.common.security.SecurityUtils;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.FriendshipStatus;
 
 @Service
 @RequiredArgsConstructor

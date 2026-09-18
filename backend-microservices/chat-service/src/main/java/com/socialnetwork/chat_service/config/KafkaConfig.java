@@ -48,12 +48,12 @@ public class KafkaConfig {
     props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
     props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JacksonJsonDeserializer.class);
 
-    props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "events.*,com.socialnetwork.*");
+    props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "com.socialnetwork.common.events");
     props.put(JacksonJsonDeserializer.USE_TYPE_INFO_HEADERS, true);
 
     props.put(
         JacksonJsonDeserializer.TYPE_MAPPINGS,
-        "eventAccept:events.FriendAcceptedEvent,eventDelete:events.FriendshipDeletedEvent");
+        "eventAccept:com.socialnetwork.common.events.FriendAcceptedEvent,eventDelete:com.socialnetwork.common.events.FriendshipDeletedEvent");
 
     return new DefaultKafkaConsumerFactory<>(props);
   }

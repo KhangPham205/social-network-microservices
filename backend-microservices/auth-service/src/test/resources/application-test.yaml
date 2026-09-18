@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:auth;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  mail:
+    host: localhost
+    port: 2525
+    username: test
+    password: test
+  kafka:
+    bootstrap-servers: localhost:9092
+    listener:
+      auto-startup: false
+  cloud:
+    discovery:
+      enabled: false
+
+eureka:
+  client:
+    enabled: false
+
+jwt:
+  secret: test-only-jwt-secret-0123456789abcdef0123456789
+  expiration: 3600000
+  refresh:
+    expiration: 604800000
+
+app:
+  internal:
+    token: test-internal-token

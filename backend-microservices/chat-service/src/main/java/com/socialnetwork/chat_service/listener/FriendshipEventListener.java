@@ -1,8 +1,8 @@
 package com.socialnetwork.chat_service.listener;
 
 import com.socialnetwork.chat_service.service.ConversationService;
-import events.FriendAcceptedEvent;
-import events.FriendshipDeletedEvent;
+import com.socialnetwork.common.events.FriendAcceptedEvent;
+import com.socialnetwork.common.events.FriendshipDeletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaHandler;

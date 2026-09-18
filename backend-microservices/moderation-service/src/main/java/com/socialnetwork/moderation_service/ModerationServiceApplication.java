@@ -4,8 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.kafka.annotation.EnableKafka;
 
-@SpringBootApplication(
-    scanBasePackages = {"com.socialnetwork.moderation_service", "security", "exception"})
+@SpringBootApplication
 @EnableKafka
 public class ModerationServiceApplication {
 

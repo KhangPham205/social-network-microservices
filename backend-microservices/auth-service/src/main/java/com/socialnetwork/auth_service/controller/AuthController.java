@@ -5,7 +5,7 @@ import com.socialnetwork.auth_service.security.JwtProvider;
 import com.socialnetwork.auth_service.service.AuthService;
 import com.socialnetwork.auth_service.service.PasswordResetService;
 import com.socialnetwork.auth_service.service.RefreshTokenService;
-import constants.ApiConstants;
+import com.socialnetwork.common.constants.ApiConstants;
 import jakarta.ws.rs.core.HttpHeaders;
 import java.util.List;
 import java.util.Map;

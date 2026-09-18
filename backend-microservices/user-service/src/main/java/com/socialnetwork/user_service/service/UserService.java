@@ -5,7 +5,7 @@ import com.socialnetwork.user_service.model.User;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
-import vo.PageVO;
+import com.socialnetwork.common.vo.PageVO;
 
 public interface UserService {
   // Hàm dành cho Auth Service gọi nội bộ khi có user đăng ký mới

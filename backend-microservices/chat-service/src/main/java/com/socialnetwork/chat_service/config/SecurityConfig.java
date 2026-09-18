@@ -10,12 +10,10 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import security.EnableCommonSecurity;
-import security.JwtAuthenticationFilter;
+import com.socialnetwork.common.security.JwtAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
-@EnableCommonSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 

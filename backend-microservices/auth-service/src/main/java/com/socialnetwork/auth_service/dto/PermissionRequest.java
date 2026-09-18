@@ -1,10 +1,11 @@
 package com.socialnetwork.auth_service.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
 public class PermissionRequest {
-  private String resource;
-  private String action;
+  @NotBlank private String resource;
+  @NotBlank private String action;
   private String description;
 }

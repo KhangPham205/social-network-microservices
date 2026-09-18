@@ -1,14 +1,16 @@
 package com.socialnetwork.auth_service.service.impl;
 
 import com.socialnetwork.auth_service.dto.PermissionRequest;
+import com.socialnetwork.auth_service.dto.PermissionResponse;
 import com.socialnetwork.auth_service.model.Permission;
 import com.socialnetwork.auth_service.repository.PermissionRepository;
 import com.socialnetwork.auth_service.service.PermissionService;
-import exception.BadRequestException;
-import exception.ResourceNotFoundException;
+import com.socialnetwork.common.exception.ConflictException;
+import com.socialnetwork.common.exception.ResourceNotFoundException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -17,58 +19,52 @@ public class PermissionServiceImpl implements PermissionService {
   private final PermissionRepository permissionRepository;
 
   @Override
-  public Permission create(PermissionRequest request) {
-    String resource = request.getResource().toUpperCase();
-    String action = request.getAction().toUpperCase();
-    String name = resource + ":" + action; // Tự động tạo tên chuẩn
-
+  @Transactional
+  public PermissionResponse create(PermissionRequest request) {
+    String name = Permission.nameOf(request.getResource(), request.getAction());
     if (permissionRepository.existsByName(name)) {
-      throw new BadRequestException("Permission already exists: " + name);
+      throw new ConflictException("Permission already exists: " + name);
     }
-
     Permission permission =
         Permission.builder()
-            .resource(resource)
-            .action(action)
-            .name(name) // Gán tên chuẩn
+            .resource(request.getResource().toUpperCase())
+            .action(request.getAction().toUpperCase())
+            .name(name)
             .description(request.getDescription())
             .build();
-
-    return permissionRepository.save(permission);
+    return PermissionResponse.from(permissionRepository.save(permission));
   }
 
   @Override
-  public List<Permission> getAll() {
-    return permissionRepository.findAll();
+  @Transactional(readOnly = true)
+  public List<PermissionResponse> getAll() {
+    return permissionRepository.findAll().stream().map(PermissionResponse::from).toList();
   }
 
   @Override
-  public Permission update(Long id, PermissionRequest request) {
-    Permission existingPermission =
+  @Transactional
+  public PermissionResponse update(Long id, PermissionRequest request) {
+    Permission existing =
         permissionRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Permission not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Permission not found: " + id));
 
-    String resource = request.getResource().toUpperCase();
-    String action = request.getAction().toUpperCase();
-    String name = resource + ":" + action;
-
-    if (!existingPermission.getName().equals(name) && permissionRepository.existsByName(name)) {
-      throw new BadRequestException("Permission name already exists: " + name);
+    String name = Permission.nameOf(request.getResource(), request.getAction());
+    if (!existing.getName().equals(name) && permissionRepository.existsByName(name)) {
+      throw new ConflictException("Permission already exists: " + name);
     }
-
-    existingPermission.setResource(resource);
-    existingPermission.setAction(action);
-    existingPermission.setName(name);
-    existingPermission.setDescription(request.getDescription());
-
-    return permissionRepository.save(existingPermission);
+    existing.setResource(request.getResource().toUpperCase());
+    existing.setAction(request.getAction().toUpperCase());
+    existing.setName(name);
+    existing.setDescription(request.getDescription());
+    return PermissionResponse.from(permissionRepository.save(existing));
   }
 
   @Override
+  @Transactional
   public void delete(Long id) {
     if (!permissionRepository.existsById(id)) {
-      throw new ResourceNotFoundException("Không tìm thấy quyền (Permission) với ID: " + id);
+      throw new ResourceNotFoundException("Permission not found: " + id);
     }
     permissionRepository.deleteById(id);
   }

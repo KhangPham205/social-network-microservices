@@ -2,7 +2,7 @@ package com.socialnetwork.moderation_service.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 @Data
 @AllArgsConstructor

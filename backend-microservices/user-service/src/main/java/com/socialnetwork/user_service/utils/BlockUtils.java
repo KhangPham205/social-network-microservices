@@ -6,7 +6,7 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import vo.friendship.FriendshipStatus;
+import com.socialnetwork.common.vo.FriendshipStatus;
 
 @Component
 @RequiredArgsConstructor

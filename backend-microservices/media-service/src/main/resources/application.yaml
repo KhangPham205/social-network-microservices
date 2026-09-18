@@ -1,15 +1,90 @@
 server:
-  port: 8083 # Port riêng cho Media Service
-  tomcat:
-    threads:
-      max: 600 # Tăng số luồng xử lý đồng thời lên 600 (mặc định 200)
-      accept-count: 200 # Tăng hàng đợi
+  port: ${SERVER_PORT:8083}
+  forward-headers-strategy: framework
 
 spring:
   application:
     name: media-service
-  profiles:
-    active: dev
+
   servlet:
     multipart:
-      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/media_db}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:password}
+  data:
+    neo4j:
+      database: neo4j
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+    consumer:
+      group-id: media-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.trusted.packages: com.socialnetwork.common.events
+        spring.json.use.type.headers: true
+    listener:
+      ack-mode: record
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+minio:
+  url: ${MINIO_URL:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:admin}
+  secret-key: ${MINIO_SECRET_KEY:password123}
+  bucket-name: ${MINIO_BUCKET:social-media}
+  # Host the browser uses to fetch objects; may differ from the internal endpoint.
+  public-url: ${MINIO_PUBLIC_URL:http://localhost:9000}
+
+milvus:
+  uri: ${MILVUS_URI:http://localhost:19530}
+
+ai-service:
+  url: ${AI_SERVICE_URL:http://localhost:8000}
+
+jwt:
+  secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-0123456789abcdef}
+
+app:
+  internal:
+    token: ${INTERNAL_API_TOKEN:dev-only-internal-token-change-me}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

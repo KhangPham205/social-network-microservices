@@ -4,8 +4,8 @@ import com.socialnetwork.moderation_service.dto.*;
 import com.socialnetwork.moderation_service.enums.ComplaintStatus;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
-import vo.PageVO;
-import vo.TargetType;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.TargetType;
 
 public interface ReportService {
   // Report
