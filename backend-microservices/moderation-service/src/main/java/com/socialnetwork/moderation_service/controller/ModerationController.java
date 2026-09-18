@@ -13,8 +13,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import vo.PageVO;
-import vo.TargetType;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.TargetType;
 
 @RestController
 @RequestMapping("/api/v1/moderation")

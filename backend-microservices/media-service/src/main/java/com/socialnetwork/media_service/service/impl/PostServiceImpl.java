@@ -15,9 +15,9 @@ import com.socialnetwork.media_service.service.PostService;
 import com.socialnetwork.media_service.service.ReactService;
 import com.socialnetwork.media_service.service.RecommendationService;
 import com.socialnetwork.media_service.service.StorageService;
-import events.ContentCreatedEvent;
-import exception.AccessDeniedException;
-import exception.ResourceNotFoundException;
+import com.socialnetwork.common.events.ContentCreatedEvent;
+import com.socialnetwork.common.exception.AccessDeniedException;
+import com.socialnetwork.common.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import java.time.Instant;
 import java.util.*;
@@ -34,8 +34,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import vo.PageVO;
-import vo.TargetType;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.TargetType;
 
 @Service
 @RequiredArgsConstructor
@@ -91,7 +91,7 @@ public class PostServiceImpl implements PostService {
       ContentCreatedEvent event =
           new ContentCreatedEvent(
               savedPost.getId(),
-              "POST",
+              TargetType.POST,
               savedPost.getContent(),
               author.getId(),
               savedPost.getMedia());

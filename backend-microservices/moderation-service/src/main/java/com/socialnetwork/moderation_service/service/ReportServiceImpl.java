@@ -12,8 +12,8 @@ import com.socialnetwork.moderation_service.model.Complaint;
 import com.socialnetwork.moderation_service.model.Report;
 import com.socialnetwork.moderation_service.repository.ComplaintRepository;
 import com.socialnetwork.moderation_service.repository.ReportRepository;
-import exception.BadRequestException;
-import exception.ResourceNotFoundException;
+import com.socialnetwork.common.exception.BadRequestException;
+import com.socialnetwork.common.exception.ResourceNotFoundException;
 import io.github.perplexhub.rsql.RSQLJPASupport;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -25,8 +25,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import vo.PageVO;
-import vo.TargetType;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.TargetType;
 
 @Slf4j
 @Service

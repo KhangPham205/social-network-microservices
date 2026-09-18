@@ -1,4 +1,6 @@
 package com.socialnetwork.media_service.service.impl;
+import com.socialnetwork.common.events.NotificationEvent;
+import com.socialnetwork.common.vo.NotificationType;
 
 import com.socialnetwork.media_service.dto.react.ReactRequest;
 import com.socialnetwork.media_service.dto.react.ReactResponse;
@@ -7,7 +9,7 @@ import com.socialnetwork.media_service.dto.react.ReactUserDto;
 import com.socialnetwork.media_service.model.*;
 import com.socialnetwork.media_service.repository.*;
 import com.socialnetwork.media_service.service.ReactService;
-import exception.ResourceNotFoundException;
+import com.socialnetwork.common.exception.ResourceNotFoundException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -21,8 +23,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import vo.PageVO;
-import vo.TargetType;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.TargetType;
 
 @Service
 @RequiredArgsConstructor
@@ -100,10 +102,11 @@ public class ReactServiceImpl implements ReactService {
 
       // Bắn Kafka Event cho Notification Service
       if (targetOwnerId != null && !targetOwnerId.equals(currentUserId)) {
-        String notificationType = tType == TargetType.POST ? "REACT_POST" : "REACT_COMMENT";
+        NotificationType notificationType =
+            tType == TargetType.POST ? NotificationType.REACT_POST : NotificationType.REACT_COMMENT;
         kafkaTemplate.send(
             "notification-topic",
-            new events.NotificationEvent(
+            NotificationEvent.of(
                 currentUserId, targetOwnerId, notificationType, targetId, targetId));
         log.info(
             "✅ Sent notification event: {} from {} to {}",

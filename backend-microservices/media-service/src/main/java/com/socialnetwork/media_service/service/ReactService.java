@@ -7,8 +7,8 @@ import com.socialnetwork.media_service.dto.react.ReactUserDto;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Pageable;
-import vo.PageVO;
-import vo.TargetType;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.TargetType;
 
 public interface ReactService {
   ReactResponse toggleReact(ReactRequest req);

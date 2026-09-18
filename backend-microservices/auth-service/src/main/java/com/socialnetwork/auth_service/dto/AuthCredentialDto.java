@@ -1,10 +1,11 @@
 package com.socialnetwork.auth_service.dto;
 
-import com.socialnetwork.auth_service.enums.AccountStatus;
+import com.socialnetwork.common.vo.AccountStatus;
 import java.util.Set;
 import lombok.Builder;
 import lombok.Data;
 
+/** Internal API view of a credential (CONTRACT section 4). */
 @Data
 @Builder
 public class AuthCredentialDto {

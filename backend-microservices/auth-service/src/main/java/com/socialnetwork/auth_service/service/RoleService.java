@@ -1,12 +1,13 @@
 package com.socialnetwork.auth_service.service;
 
-import com.socialnetwork.auth_service.model.Role;
+import com.socialnetwork.auth_service.dto.RoleResponse;
 import java.util.List;
 
 public interface RoleService {
-  Role assignPermission(Long roleId, Long permissionId);
 
-  Role removePermission(Long roleId, Long permissionId);
+  RoleResponse assignPermission(Long roleId, Long permissionId);
 
-  List<Role> getAll();
+  RoleResponse removePermission(Long roleId, Long permissionId);
+
+  List<RoleResponse> getAll();
 }

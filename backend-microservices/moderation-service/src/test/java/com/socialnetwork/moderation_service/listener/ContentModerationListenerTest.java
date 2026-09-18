@@ -23,7 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 /**
  * Unit tests for {@link ContentModerationListener}.

@@ -1,11 +1,13 @@
 package com.socialnetwork.auth_service.service;
 
 import com.socialnetwork.auth_service.enums.OtpType;
-import com.socialnetwork.auth_service.model.UserCredential;
-import jakarta.mail.MessagingException;
 
 public interface EmailService {
-  void sendVerificationEmail(String to, String subject, String body) throws MessagingException;
 
-  void sendEmail(UserCredential user, OtpType otpType, String otp);
+  /**
+   * Sends a one-time code.
+   *
+   * @throws com.socialnetwork.auth_service.exception.MailDeliveryException when SMTP fails
+   */
+  void sendOtp(String to, OtpType otpType, String otp);
 }

@@ -2,8 +2,8 @@ package com.socialnetwork.auth_service.compensator;
 
 import com.socialnetwork.auth_service.enums.AccountStatus;
 import com.socialnetwork.auth_service.repository.UserCredentialRepository;
-import events.ProfileCreatedEvent;
-import events.ProfileFailedEvent;
+import com.socialnetwork.common.events.ProfileCreatedEvent;
+import com.socialnetwork.common.events.ProfileFailedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;

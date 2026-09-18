@@ -6,7 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 @Data
 @Builder

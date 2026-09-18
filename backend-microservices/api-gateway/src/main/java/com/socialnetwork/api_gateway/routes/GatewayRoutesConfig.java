@@ -2,84 +2,59 @@ package com.socialnetwork.api_gateway.routes;
 
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
+import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder.Builder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Route table of the public API. One REST route and one OpenAPI aggregation route per service,
+ * plus the two STOMP WebSocket upgrades. Internal endpoints ({@code /internal/**}) are rejected
+ * before routing by {@link com.socialnetwork.api_gateway.filter.InternalPathBlockingFilter}; the
+ * gateway's own {@code /actuator/**} and {@code /swagger-ui.html} are intentionally not routed.
+ */
 @Configuration
 public class GatewayRoutesConfig {
 
+  private static final String AUTH_SERVICE = "auth-service";
+  private static final String USER_SERVICE = "user-service";
+  private static final String MEDIA_SERVICE = "media-service";
+  private static final String NOTIFICATION_SERVICE = "notification-service";
+  private static final String CHAT_SERVICE = "chat-service";
+  private static final String MODERATION_SERVICE = "moderation-service";
+
   @Bean
   public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
-    return builder
-        .routes()
+    Builder routes = builder.routes();
 
-        // ================= AUTH =================
-        .route("auth-service", r -> r.path("/api/v1/auth/**").uri("lb://auth-service"))
-        .route(
-            "auth-service-swagger",
-            r ->
-                r.path("/aggregate/auth-service/v3/api-docs/**")
-                    .filters(f -> f.setPath("/v3/api-docs"))
-                    .uri("lb://auth-service"))
+    service(routes, AUTH_SERVICE, "/api/v1/auth/**");
+    service(routes, USER_SERVICE, "/api/v1/users/**");
+    service(routes, MEDIA_SERVICE, "/api/v1/media/**");
+    service(routes, NOTIFICATION_SERVICE, "/api/v1/notifications/**");
+    service(routes, CHAT_SERVICE, "/api/v1/chat/**");
+    service(routes, MODERATION_SERVICE, "/api/v1/moderation/**");
 
-        // ================= USER =================
-        .route("user-service", r -> r.path("/api/v1/users/**").uri("lb://user-service"))
-        .route(
-            "user-service-swagger",
-            r ->
-                r.path("/aggregate/user-service/v3/api-docs/**")
-                    .filters(f -> f.setPath("/v3/api-docs"))
-                    .uri("lb://user-service"))
+    routes.route(
+        "notification-ws",
+        r -> r.path("/ws/notification/**").uri("lb:ws://" + NOTIFICATION_SERVICE));
+    routes.route("chat-service-ws", r -> r.path("/ws/chat/**").uri("lb:ws://" + CHAT_SERVICE));
 
-        // ================= MEDIA =================
-        .route("media-service", r -> r.path("/api/v1/media/**").uri("lb://media-service"))
-        .route(
-            "media-service-swagger",
-            r ->
-                r.path("/aggregate/media-service/v3/api-docs/**")
-                    .filters(f -> f.setPath("/v3/api-docs"))
-                    .uri("lb://media-service"))
+    return routes.build();
+  }
 
-        // ================= NOTIFICATION =================
-        .route(
-            "notification-service",
-            r -> r.path("/api/v1/notifications/**").uri("lb://notification-service"))
-        .route(
-            "notification-service-swagger",
-            r ->
-                r.path("/aggregate/notification-service/v3/api-docs/**")
-                    .filters(f -> f.setPath("/v3/api-docs"))
-                    .uri("lb://notification-service"))
-        .route(
-            "notification-ws",
-            r -> r.path("/ws/notification/**").uri("lb:ws://notification-service"))
-
-        // ================= CHAT =================
-        .route("chat-service", r -> r.path("/api/v1/chat/**").uri("lb://chat-service"))
-        .route(
-            "chat-service-swagger",
-            r ->
-                r.path("/aggregate/chat-service/v3/api-docs/**")
-                    .filters(f -> f.setPath("/v3/api-docs"))
-                    .uri("lb://chat-service"))
-        .route(
-            "chat-service-swagger-ui",
-            r ->
-                r.path("/aggregate/chat-service/swagger-ui/**")
-                    .filters(f -> f.setPath("/swagger-ui"))
-                    .uri("lb://chat-service"))
-        .route("chat-service-ws", r -> r.path("/ws/chat/**").uri("lb:ws://chat-service"))
-        .route(
-            "moderation-service",
-            r ->
-                r.path("/api/v1/moderation/**", "/api/v1/reports/**", "/api/v1/complaints/**")
-                    .uri("lb://moderation-service"))
-        .route(
-            "moderation-service-swagger",
-            r ->
-                r.path("/aggregate/moderation-service/v3/api-docs/**")
-                    .filters(f -> f.setPath("/v3/api-docs"))
-                    .uri("lb://moderation-service"))
-        .build();
+  /**
+   * Registers the REST route {@code <serviceId>} for {@code apiPrefix} and the OpenAPI aggregation
+   * route {@code <serviceId>-swagger} that maps {@code /aggregate/<serviceId>/v3/api-docs/**} to
+   * the service's own {@code /v3/api-docs/**} (sub-paths such as {@code /swagger-config} or group
+   * documents are preserved).
+   */
+  private static void service(Builder routes, String serviceId, String apiPrefix) {
+    String uri = "lb://" + serviceId;
+    routes.route(serviceId, r -> r.path(apiPrefix).uri(uri));
+    routes.route(
+        serviceId + "-swagger",
+        r ->
+            r.path("/aggregate/" + serviceId + "/v3/api-docs/**")
+                .filters(f -> f.rewritePath("/aggregate/" + serviceId + "/(?<rest>.*)", "/${rest}"))
+                .uri(uri));
   }
 }

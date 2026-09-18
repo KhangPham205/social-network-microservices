@@ -4,7 +4,7 @@ import com.socialnetwork.user_service.events.FriendshipAcceptedEvent;
 import com.socialnetwork.user_service.events.FriendshipDeletedEvent;
 import com.socialnetwork.user_service.model.node.UserNode;
 import com.socialnetwork.user_service.repository.neo4j.UserNodeRepository;
-import events.UserCreatedEvent;
+import com.socialnetwork.common.events.UserCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;

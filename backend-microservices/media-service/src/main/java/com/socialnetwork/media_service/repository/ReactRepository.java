@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 @Repository
 public interface ReactRepository extends JpaRepository<React, Long> {

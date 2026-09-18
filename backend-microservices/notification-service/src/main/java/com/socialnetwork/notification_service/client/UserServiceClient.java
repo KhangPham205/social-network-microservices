@@ -1,17 +1,16 @@
 package com.socialnetwork.notification_service.client;
 
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.service.annotation.GetExchange;
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.dto.UserSummary;
+import java.util.List;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.service.annotation.HttpExchange;
+import org.springframework.web.service.annotation.PostExchange;
 
-@HttpExchange("/api/v1/users/internal")
+/** user-service internal API (token protected, see CONTRACT section 4). */
+@HttpExchange(ApiConstants.USERS + ApiConstants.INTERNAL)
 public interface UserServiceClient {
 
-  @GetExchange("/{userId}/network-ids")
-  java.util.List<Long> getNetworkIds(@PathVariable("userId") Long userId);
-
-  @GetExchange("/check-friendship")
-  boolean isFriend(
-      @org.springframework.web.bind.annotation.RequestParam("user1") Long user1,
-      @org.springframework.web.bind.annotation.RequestParam("user2") Long user2);
+  @PostExchange("/summaries")
+  List<UserSummary> getSummaries(@RequestBody List<Long> ids);
 }

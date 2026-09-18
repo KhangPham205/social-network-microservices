@@ -1,78 +1,57 @@
 package com.socialnetwork.auth_service.service.impl;
 
 import com.socialnetwork.auth_service.enums.OtpType;
-import com.socialnetwork.auth_service.model.UserCredential;
+import com.socialnetwork.auth_service.exception.MailDeliveryException;
 import com.socialnetwork.auth_service.service.EmailService;
-import exception.BadRequestException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class EmailServiceImpl implements EmailService {
 
-  @Autowired private JavaMailSender emailSender;
-
-  private void sendVerificationEmailInternal(String to, String subject, String body)
-      throws MessagingException {
-    MimeMessage mimeMessage = emailSender.createMimeMessage();
-    MimeMessageHelper mimeMessageHelper = new MimeMessageHelper(mimeMessage, true);
-
-    // Set email parameters
-    mimeMessageHelper.setTo(to);
-    mimeMessageHelper.setSubject(subject);
-    mimeMessageHelper.setText(body, true); // true indicates HTML content
-
-    // Send the email
-    emailSender.send(mimeMessage);
-  }
+  private final JavaMailSender mailSender;
 
   @Override
-  public void sendVerificationEmail(String to, String subject, String body) {
+  public void sendOtp(String to, OtpType otpType, String otp) {
+    String subject =
+        switch (otpType) {
+          case VERIFY_EMAIL -> "Account Verification";
+          case RESET_PASSWORD -> "Reset Your Password";
+        };
     try {
-      sendVerificationEmailInternal(to, subject, body);
-    } catch (MessagingException e) {
-      log.error("Error sending verification email", e);
-      throw new BadRequestException("Failed to send verification email: " + e.getMessage());
+      MimeMessage mimeMessage = mailSender.createMimeMessage();
+      MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
+      helper.setTo(to);
+      helper.setSubject(subject);
+      helper.setText(htmlBody(otp), true);
+      mailSender.send(mimeMessage);
+    } catch (MessagingException | MailException e) {
+      log.error("Failed to send {} e-mail", otpType, e);
+      throw new MailDeliveryException("E-mail service is unavailable, please try again later");
     }
   }
 
-  @Override
-  public void sendEmail(UserCredential user, OtpType otpType, String otp) {
-    String subject;
-    String verificationCode;
-
-    if (otpType == OtpType.VERIFY_EMAIL) {
-      subject = "Account Verification";
-      verificationCode = otp;
-    } else if (otpType == OtpType.RESET_PASSWORD) {
-      subject = "Reset Your Password";
-      verificationCode = otp;
-    } else {
-      throw new BadRequestException("Invalid OTP type");
-    }
-
-    String htmlMessage =
-        "<html>"
-            + "<body style=\"font-family: Arial, sans-serif;\">"
-            + "<div style=\"background-color: #f5f5f5; padding: 20px;\">"
-            + "<h2 style=\"color: #333;\">Welcome to our app!</h2>"
-            + "<p style=\"font-size: 16px;\">Please enter the verification code below to continue:</p>"
-            + "<div style=\"background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);\">"
-            + "<h3 style=\"color: #333;\">Verification Code:</h3>"
-            + "<p style=\"font-size: 18px; font-weight: bold; color: #007bff;\">"
-            + verificationCode
-            + "</p>"
-            + "</div>"
-            + "</div>"
-            + "</body>"
-            + "</html>";
-
-    sendVerificationEmail(user.getEmail(), subject, htmlMessage);
+  private static String htmlBody(String code) {
+    return """
+        <html><body style="font-family: Arial, sans-serif;">
+          <div style="background-color: #f5f5f5; padding: 20px;">
+            <h2 style="color: #333;">Welcome to our app!</h2>
+            <p style="font-size: 16px;">Please enter the verification code below to continue:</p>
+            <div style="background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
+              <h3 style="color: #333;">Verification Code:</h3>
+              <p style="font-size: 18px; font-weight: bold; color: #007bff;">%s</p>
+            </div>
+          </div>
+        </body></html>
+        """
+        .formatted(code);
   }
 }

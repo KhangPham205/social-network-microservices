@@ -1,26 +1,66 @@
 server:
-  port: 8084
-  http2:
-    enabled: true
-  compression:
-    enabled: true
-    min-response-size: 1024
+  port: ${SERVER_PORT:8084}
+  forward-headers-strategy: framework
 
 spring:
   application:
     name: notification-service
-  profiles:
-    active: dev
-  servlet:
-    multipart:
-      enabled: true
-  messages:
-    encoding: UTF-8
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5435/notification_db}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+  data:
+    web:
+      pageable:
+        max-page-size: 50
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+    consumer:
+      group-id: notification-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.trusted.packages: com.socialnetwork.common.events
+        spring.json.use.type.headers: true
+    listener:
+      ack-mode: record
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+jwt:
+  secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-0123456789abcdef}
+
+app:
+  internal:
+    token: ${INTERNAL_API_TOKEN:dev-only-internal-token-change-me}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
 
 springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
-  server:
-    url: http://localhost:8080 # Trỏ về API Gateway
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

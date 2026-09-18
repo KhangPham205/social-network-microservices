@@ -11,7 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import vo.PageVO;
+import com.socialnetwork.common.vo.PageVO;
 
 @RestController
 @RequestMapping("/api/v1/media/comments")

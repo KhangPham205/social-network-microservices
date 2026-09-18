@@ -2,8 +2,10 @@ package com.socialnetwork.media_service;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
-@SpringBootApplication(scanBasePackages = {"com.socialnetwork.media_service", "exception"})
+@SpringBootApplication
+@ConfigurationPropertiesScan
 public class MediaServiceApplication {
 
   public static void main(String[] args) {

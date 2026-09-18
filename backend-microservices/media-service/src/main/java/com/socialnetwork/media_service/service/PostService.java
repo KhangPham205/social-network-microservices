@@ -7,7 +7,7 @@ import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import vo.PageVO;
+import com.socialnetwork.common.vo.PageVO;
 
 public interface PostService {
   PostResponse create(String content, String accessModifier, List<MultipartFile> mediaFiles);

@@ -1,4 +1,6 @@
 package com.socialnetwork.media_service.service.impl;
+import com.socialnetwork.common.events.NotificationEvent;
+import com.socialnetwork.common.vo.NotificationType;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.socialnetwork.media_service.client.UserServiceClient;
@@ -17,9 +19,9 @@ import com.socialnetwork.media_service.repository.UserCacheRepository;
 import com.socialnetwork.media_service.service.CommentService;
 import com.socialnetwork.media_service.service.ReactService;
 import com.socialnetwork.media_service.service.StorageService;
-import events.ContentCreatedEvent;
-import exception.AccessDeniedException;
-import exception.ResourceNotFoundException;
+import com.socialnetwork.common.events.ContentCreatedEvent;
+import com.socialnetwork.common.exception.AccessDeniedException;
+import com.socialnetwork.common.exception.ResourceNotFoundException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -31,8 +33,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import vo.PageVO;
-import vo.TargetType;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.TargetType;
 
 @Service
 @RequiredArgsConstructor
@@ -100,7 +102,7 @@ public class CommentServiceImpl implements CommentService {
     try {
       ContentCreatedEvent event =
           new ContentCreatedEvent(
-              saved.getId(), "COMMENT", saved.getContent(), author.getId(), saved.getMedia());
+              saved.getId(), TargetType.COMMENT, saved.getContent(), author.getId(), saved.getMedia());
       String payload = objectMapper.writeValueAsString(event);
       kafkaTemplate.send("content-created-topic", payload);
     } catch (Exception e) {
@@ -112,11 +114,12 @@ public class CommentServiceImpl implements CommentService {
         parent != null ? parent.getAuthor().getId() : post.getAuthor().getId();
 
     if (!notificationReceiverId.equals(currentUserId)) {
-      String notificationType = parent != null ? "REPLY_COMMENT" : "COMMENT_POST";
+      NotificationType notificationType =
+          parent != null ? NotificationType.REPLY_COMMENT : NotificationType.COMMENT_POST;
       Long postId = post.getId();
       kafkaTemplate.send(
           "notification-topic",
-          new events.NotificationEvent(
+          NotificationEvent.of(
               currentUserId, notificationReceiverId, notificationType, saved.getId(), postId));
       log.info(
           "Sent notification event: {} from {} to {}",

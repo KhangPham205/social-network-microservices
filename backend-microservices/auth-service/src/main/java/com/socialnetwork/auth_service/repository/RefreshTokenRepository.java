@@ -1,18 +1,18 @@
 package com.socialnetwork.auth_service.repository;
 
 import com.socialnetwork.auth_service.model.RefreshToken;
-import com.socialnetwork.auth_service.model.UserCredential;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-@Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
+
   Optional<RefreshToken> findByToken(String token);
 
+  /** Revokes every refresh token of a user. Must run inside a transaction. */
   @Modifying
-  @Transactional
-  void deleteByUser(UserCredential user);
+  @Query("delete from RefreshToken r where r.user.id = :userId")
+  int deleteAllByUserId(@Param("userId") Long userId);
 }

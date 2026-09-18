@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  neo4j:
+    uri: ${NEO4J_URI}
+    authentication:
+      username: ${NEO4J_USERNAME}
+      password: ${NEO4J_PASSWORD}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL}
+
+minio:
+  url: ${MINIO_URL}
+  access-key: ${MINIO_ACCESS_KEY}
+  secret-key: ${MINIO_SECRET_KEY}
+  bucket-name: ${MINIO_BUCKET}
+  public-url: ${MINIO_PUBLIC_URL}
+
+milvus:
+  uri: ${MILVUS_URI}
+
+ai-service:
+  url: ${AI_SERVICE_URL}
+
+jwt:
+  secret: ${JWT_SECRET}
+
+app:
+  internal:
+    token: ${INTERNAL_API_TOKEN}

@@ -1,57 +1,48 @@
 package com.socialnetwork.notification_service.controller;
 
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.security.SecurityUtils;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.notification_service.dto.NotificationCountDto;
 import com.socialnetwork.notification_service.dto.NotificationDto;
 import com.socialnetwork.notification_service.service.NotificationService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
-import vo.PageVO;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-@Slf4j
 @RestController
-@RequestMapping("/api/v1/notifications")
+@RequestMapping(ApiConstants.NOTIFICATIONS)
 @RequiredArgsConstructor
 public class NotificationController {
 
   private final NotificationService notificationService;
 
-  // Helper để lấy userId từ SecurityContext
-  private Long getCurrentUserId() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication != null && authentication.isAuthenticated()) {
-      return Long.parseLong(authentication.getName());
-    }
-    throw new RuntimeException("Unauthorized");
-  }
-
-  // 1. Lấy danh sách thông báo
   @GetMapping
   public ResponseEntity<PageVO<NotificationDto>> getMyNotifications(
       @ParameterObject Pageable pageable) {
-    Long userId = getCurrentUserId();
-    log.info("Fetching notifications for user: {}", userId);
-    return ResponseEntity.ok(notificationService.getMyNotifications(userId, pageable));
+    return ResponseEntity.ok(
+        notificationService.getMyNotifications(SecurityUtils.getCurrentUserId(), pageable));
   }
 
-  // 2. Đánh dấu 1 thông báo là đã đọc
+  @GetMapping("/unread-count")
+  public ResponseEntity<NotificationCountDto> getUnreadCount() {
+    return ResponseEntity.ok(notificationService.getUnreadCount(SecurityUtils.getCurrentUserId()));
+  }
+
   @PutMapping("/{id}/read")
   public ResponseEntity<NotificationDto> markAsRead(@PathVariable("id") Long id) {
-    Long userId = getCurrentUserId();
-    log.info("Marking notification {} as read for user: {}", id, userId);
-    return ResponseEntity.ok(notificationService.markAsRead(userId, id));
+    return ResponseEntity.ok(notificationService.markAsRead(SecurityUtils.getCurrentUserId(), id));
   }
 
-  // 3. Đánh dấu TẤT CẢ là đã đọc
   @PutMapping("/read-all")
   public ResponseEntity<Void> markAllAsRead() {
-    Long userId = getCurrentUserId();
-    log.info("Marking all notifications as read for user: {}", userId);
-    notificationService.markAllAsRead(userId);
+    notificationService.markAllAsRead(SecurityUtils.getCurrentUserId());
     return ResponseEntity.noContent().build();
   }
 }

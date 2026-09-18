@@ -1,17 +1,19 @@
 package com.socialnetwork.moderation_service.model;
 
 import com.socialnetwork.moderation_service.enums.ComplaintStatus;
-import entity.BaseEntity;
+import com.socialnetwork.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 @Entity
 @Table(name = "complaints")
-@Data
+@Getter
+@Setter
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor

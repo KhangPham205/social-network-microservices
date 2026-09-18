@@ -12,6 +12,8 @@ import lombok.NoArgsConstructor;
 @Builder
 public class RefreshTokenResponse {
   private String message;
-  TokenResponse tokenResponse;
+  private TokenResponse tokenResponse;
+
+  /** Role names without the {@code ROLE_} prefix. */
   private List<String> roles;
 }

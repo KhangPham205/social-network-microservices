@@ -9,7 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 @Entity
 @Table(name = "reports")

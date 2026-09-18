@@ -1,45 +1,50 @@
 package com.socialnetwork.auth_service.model;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(
     name = "permissions",
-    // Đảm bảo không thể có 2 quyền "POST:READ"
     uniqueConstraints = @UniqueConstraint(columnNames = {"resource", "action"}))
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class Permission {
+
+  public static final String SEPARATOR = ":";
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
+  /** e.g. "POST", "USER", "REPORT". */
   @Column(nullable = false)
-  private String resource; // Ví dụ: "POST", "USER", "COMMENT", "ADMIN_DASHBOARD"
+  private String resource;
 
+  /** e.g. "CREATE", "READ", "UPDATE", "DELETE". */
   @Column(nullable = false)
-  private String action; // Ví dụ: "CREATE", "READ", "UPDATE", "DELETE", "MODERATE"
+  private String action;
 
-  /** Tên quyền đầy đủ (ví dụ: "POST:READ", "USER:DELETE") */
+  /** Authority name carried in the JWT: {@code RESOURCE:ACTION}. */
   @Column(nullable = false, unique = true)
   private String name;
 
   private String description;
 
-  /**
-   * Đây là một "trick" của JPA. Trước khi lưu (persist) một Permission mới, nó sẽ tự động tạo ra
-   * trường 'name' chuẩn hóa.
-   */
-  @PrePersist
-  public void generateName() {
-    if (this.name == null) {
-      this.name = this.resource.toUpperCase() + ":" + this.action.toUpperCase();
-    }
+  public static String nameOf(String resource, String action) {
+    return resource.toUpperCase() + SEPARATOR + action.toUpperCase();
   }
 }

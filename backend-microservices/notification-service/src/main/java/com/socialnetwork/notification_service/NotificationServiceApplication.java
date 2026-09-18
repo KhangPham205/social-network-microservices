@@ -4,8 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 
-@SpringBootApplication(
-    scanBasePackages = {"com.socialnetwork.notification_service", "security", "exception"})
+@SpringBootApplication
 @EnableDiscoveryClient
 public class NotificationServiceApplication {
 

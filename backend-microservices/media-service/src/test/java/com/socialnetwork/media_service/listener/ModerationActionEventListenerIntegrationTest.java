@@ -1,4 +1,6 @@
 package com.socialnetwork.media_service.listener;
+import com.socialnetwork.common.vo.ModerationAction;
+import com.socialnetwork.common.vo.TargetType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -9,7 +11,7 @@ import com.socialnetwork.media_service.service.CommentService;
 import com.socialnetwork.media_service.service.PostService;
 import com.socialnetwork.media_service.service.RecommendationService;
 import com.socialnetwork.media_service.service.StorageService;
-import events.ModerationActionEvent;
+import com.socialnetwork.common.events.ModerationActionEvent;
 import io.github.perplexhub.rsql.RSQLJPAAutoConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -128,7 +130,7 @@ class ModerationActionEventListenerIntegrationTest {
       isConsumerReady = true;
     }
 
-    kafkaTemplate.send(MODERATION_ACTIONS_TOPIC, event.getTargetId(), event).get();
+    kafkaTemplate.send(MODERATION_ACTIONS_TOPIC, event.targetId(), event).get();
     // Give the async consumer up to 5 seconds to process the record
     Thread.sleep(2_000);
   }
@@ -145,8 +147,8 @@ class ModerationActionEventListenerIntegrationTest {
     ModerationActionEvent blockEvent =
         ModerationActionEvent.builder()
             .targetId(postId.toString())
-            .targetType("POST")
-            .action("BLOCK")
+            .targetType(TargetType.POST)
+            .action(ModerationAction.BLOCK)
             .build();
 
     // --- Act ---
@@ -174,8 +176,8 @@ class ModerationActionEventListenerIntegrationTest {
     ModerationActionEvent blockEvent =
         ModerationActionEvent.builder()
             .targetId(commentId.toString())
-            .targetType("COMMENT")
-            .action("BLOCK")
+            .targetType(TargetType.COMMENT)
+            .action(ModerationAction.BLOCK)
             .build();
 
     // --- Act ---
@@ -201,8 +203,8 @@ class ModerationActionEventListenerIntegrationTest {
     ModerationActionEvent unblockEvent =
         ModerationActionEvent.builder()
             .targetId(postId.toString())
-            .targetType("POST")
-            .action("UNBLOCK")
+            .targetType(TargetType.POST)
+            .action(ModerationAction.UNBLOCK)
             .build();
 
     // --- Act ---
@@ -223,7 +225,7 @@ class ModerationActionEventListenerIntegrationTest {
   void whenUnsupportedTargetType_thenNoServiceIsCalled() throws Exception {
     // --- Arrange ---
     ModerationActionEvent userEvent =
-        ModerationActionEvent.builder().targetId("9").targetType("USER").action("BLOCK").build();
+        ModerationActionEvent.builder().targetId("9").targetType(TargetType.USER).action(ModerationAction.BLOCK).build();
 
     // --- Act ---
     publishAndAwait(userEvent);

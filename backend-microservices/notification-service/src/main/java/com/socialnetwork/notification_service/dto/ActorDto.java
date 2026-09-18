@@ -1,12 +1,4 @@
 package com.socialnetwork.notification_service.dto;
 
-import lombok.Builder;
-import lombok.Data;
-
-@Data
-@Builder
-public class ActorDto {
-  private Long id;
-  private String displayName;
-  private String avatarUrl;
-}
+/** Public identity of the user who triggered a notification. */
+public record ActorDto(Long id, String displayName, String avatarUrl) {}

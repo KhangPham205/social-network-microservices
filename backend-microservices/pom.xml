@@ -1,7 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
 
@@ -9,8 +9,11 @@
     <artifactId>backend-microservices</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
+    <name>backend-microservices</name>
+    <description>Social network backend: Spring Boot microservices behind a Spring Cloud Gateway</description>
 
     <modules>
+        <module>common</module>
         <module>discovery-server</module>
         <module>api-gateway</module>
         <module>auth-service</module>
@@ -19,29 +22,39 @@
         <module>notification-service</module>
         <module>chat-service</module>
         <module>moderation-service</module>
-        <module>common</module>
     </modules>
 
     <properties>
         <java.version>21</java.version>
-        <spring.boot.version>4.0.3</spring.boot.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <spring-boot.version>4.0.3</spring-boot.version>
         <spring-cloud.version>2025.1.0</spring-cloud.version>
 
-        <lombok.version>1.18.32</lombok.version>
+        <!-- Keep in sync with the lombok version managed by spring-boot-dependencies. -->
+        <lombok.version>1.18.42</lombok.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+
+        <springdoc.version>3.0.1</springdoc.version>
+        <springdoc-webflux.version>3.0.3</springdoc-webflux.version>
+        <jjwt.version>0.12.6</jjwt.version>
+        <rsql-jpa.version>6.0.33</rsql-jpa.version>
+        <minio.version>8.5.7</minio.version>
+        <milvus.version>2.5.3</milvus.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
-                <version>${spring.boot.version}</version>
+                <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
@@ -50,22 +63,78 @@
                 <scope>import</scope>
             </dependency>
 
+            <!-- In-house -->
+            <dependency>
+                <groupId>com.socialnetwork</groupId>
+                <artifactId>common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- Third party versions live here only -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+                <version>${springdoc-webflux.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.perplexhub</groupId>
+                <artifactId>rsql-jpa-spring-boot-starter</artifactId>
+                <version>${rsql-jpa.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>${minio.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.milvus</groupId>
+                <artifactId>milvus-sdk-java</artifactId>
+                <version>${milvus.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <build>
         <pluginManagement>
             <plugins>
-
-                <!-- Compiler -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.11.0</version>
+                    <version>3.14.0</version>
                     <configuration>
-                        <source>${java.version}</source>
-                        <target>${java.version}</target>
-
+                        <release>${java.version}</release>
+                        <!-- Spring Framework 7 needs parameter names for @PathVariable/@RequestParam without explicit names -->
+                        <parameters>true</parameters>
                         <annotationProcessorPaths>
                             <path>
                                 <groupId>org.projectlombok</groupId>
@@ -80,42 +149,46 @@
                             <path>
                                 <groupId>org.projectlombok</groupId>
                                 <artifactId>lombok-mapstruct-binding</artifactId>
-                                <version>0.2.0</version>
+                                <version>${lombok-mapstruct-binding.version}</version>
                             </path>
                         </annotationProcessorPaths>
                     </configuration>
                 </plugin>
 
-                <!-- Spring Boot -->
+                <!-- Without spring-boot-starter-parent the repackage goal must be bound explicitly,
+                     otherwise `mvn package` yields non-executable jars. -->
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
-                    <version>${spring.boot.version}</version>
+                    <version>${spring-boot.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
 
                 <plugin>
                     <groupId>com.diffplug.spotless</groupId>
                     <artifactId>spotless-maven-plugin</artifactId>
                     <version>2.43.0</version>
-
                     <configuration>
                         <java>
                             <googleJavaFormat/>
                         </java>
                     </configuration>
-
-                    <executions>
-                        <execution>
-                            <goals>
-                                <goal>apply</goal>
-                            </goals>
-                            <phase>validate</phase>
-                        </execution>
-                    </executions>
-
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
 
 </project>

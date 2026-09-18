@@ -1,8 +1,9 @@
 package com.socialnetwork.user_service.event;
+import com.socialnetwork.common.vo.NotificationType;
 
 import com.socialnetwork.user_service.events.FriendshipAcceptedEvent;
 import com.socialnetwork.user_service.events.FriendshipDeletedEvent;
-import events.NotificationEvent;
+import com.socialnetwork.common.events.NotificationEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -20,9 +21,9 @@ public class EventPublisher {
   public static final String NOTIFICATION_TOPIC = "notification-topic";
 
   public void publishNotificationEvent(
-      Long actorId, Long receiverId, Long postId, Long targetId, String type) {
+      Long actorId, Long receiverId, Long postId, Long targetId, NotificationType type) {
     try {
-      NotificationEvent event = new NotificationEvent(actorId, receiverId, type, targetId, postId);
+      NotificationEvent event = NotificationEvent.of(actorId, receiverId, type, targetId, postId);
       kafkaTemplate.send(NOTIFICATION_TOPIC, receiverId.toString(), event);
       log.info(
           "Published NotificationEvent: type={}, actor={}, receiver={}", type, actorId, receiverId);

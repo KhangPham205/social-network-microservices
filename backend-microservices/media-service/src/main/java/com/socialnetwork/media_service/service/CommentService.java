@@ -5,7 +5,7 @@ import com.socialnetwork.media_service.dto.comment.CommentResponse;
 import com.socialnetwork.media_service.dto.comment.UpdateCommentRequest;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
-import vo.PageVO;
+import com.socialnetwork.common.vo.PageVO;
 
 public interface CommentService {
   CommentResponse createComment(CommentRequest request);

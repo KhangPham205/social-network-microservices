@@ -1,7 +1,7 @@
 package com.socialnetwork.moderation_service.repository;
 
 import com.socialnetwork.moderation_service.model.Complaint;
-import dto.IdCount;
+import com.socialnetwork.common.dto.IdCount;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import vo.TargetType;
+import com.socialnetwork.common.vo.TargetType;
 
 @Repository
 public interface ComplaintRepository

@@ -1,10 +1,8 @@
 package com.socialnetwork.auth_service.security;
 
-import com.socialnetwork.auth_service.model.Role;
 import com.socialnetwork.auth_service.model.UserCredential;
 import com.socialnetwork.auth_service.repository.UserCredentialRepository;
-import java.util.HashSet;
-import java.util.Set;
+import com.socialnetwork.common.vo.AccountStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -13,11 +11,13 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Exposes credentials to Spring Security with the same authorities the JWT carries. */
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
   private final UserCredentialRepository userCredentialRepository;
+  private final AuthorityMapper authorityMapper;
 
   @Override
   @Transactional(readOnly = true)
@@ -27,21 +27,11 @@ public class CustomUserDetailsService implements UserDetailsService {
             .findByUsername(username)
             .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-    Set<Role> roles = user.getRoles();
-    Set<String> roleNames = new HashSet<>();
-    Set<String> permissionNames = new HashSet<>();
-
-    for (Role role : roles) {
-      roleNames.add(role.getName().replace("ROLE_", ""));
-
-      role.getPermissions().forEach(permission -> permissionNames.add(permission.getName()));
-    }
-
-    return User.builder()
-        .username(user.getUsername())
+    return User.withUsername(user.getUsername())
         .password(user.getPassword())
-        .roles(roleNames.toArray(new String[0]))
-        .authorities(permissionNames.toArray(new String[0]))
+        .authorities(authorityMapper.grantedAuthorities(user))
+        .accountLocked(user.getStatus() == AccountStatus.BLOCKED)
+        .disabled(user.getStatus() != AccountStatus.ACTIVE)
         .build();
   }
 }

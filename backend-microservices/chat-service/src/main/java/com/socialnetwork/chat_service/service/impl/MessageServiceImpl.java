@@ -12,8 +12,8 @@ import com.socialnetwork.chat_service.repository.jpa.ChatRoomRepository;
 import com.socialnetwork.chat_service.repository.jpa.RoomMemberRepository;
 import com.socialnetwork.chat_service.repository.mongo.ChatMessageRepository;
 import com.socialnetwork.chat_service.service.MessageService;
-import exception.AccessDeniedException;
-import exception.ResourceNotFoundException;
+import com.socialnetwork.common.exception.AccessDeniedException;
+import com.socialnetwork.common.exception.ResourceNotFoundException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,7 +28,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import vo.CursorPage;
+import com.socialnetwork.common.vo.CursorPage;
 
 @Service
 @RequiredArgsConstructor

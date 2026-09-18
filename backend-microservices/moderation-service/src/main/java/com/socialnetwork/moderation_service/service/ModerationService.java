@@ -7,8 +7,8 @@ import com.socialnetwork.moderation_service.dto.external.PostResponse;
 import com.socialnetwork.moderation_service.enums.AccountStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
-import vo.PageVO;
-import vo.TargetType;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.common.vo.TargetType;
 
 public interface ModerationService {
 

@@ -4,7 +4,7 @@ import com.socialnetwork.chat_service.dto.MessageRequest;
 import com.socialnetwork.chat_service.dto.MessageResponse;
 import java.util.List;
 import java.util.Map;
-import vo.CursorPage;
+import com.socialnetwork.common.vo.CursorPage;
 
 public interface MessageService {
   Map<String, Object> sendMessage(MessageRequest req);

@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
-@SpringBootApplication(scanBasePackages = {"com.socialnetwork.chat_service", "exception"})
+@SpringBootApplication
 @EnableJpaRepositories("com.socialnetwork.chat_service.repository.jpa")
 @EnableMongoRepositories("com.socialnetwork.chat_service.repository.mongo")
 public class ChatServiceApplication {

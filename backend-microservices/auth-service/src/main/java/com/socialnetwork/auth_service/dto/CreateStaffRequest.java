@@ -1,12 +1,16 @@
 package com.socialnetwork.auth_service.dto;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
 public class CreateStaffRequest {
-  private String username;
-  private String password;
-  private String email;
+  @NotBlank private String username;
+  @NotBlank private String password;
+  @NotBlank @Email private String email;
   private String fullname;
-  private String roleName; // Tên của Role (ví dụ: "ADMIN" hoặc "MODERATOR")
+
+  /** Role name without prefix, e.g. "ADMIN" or "MODERATOR". */
+  @NotBlank private String roleName;
 }
