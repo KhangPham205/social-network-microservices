@@ -12,6 +12,7 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 @Configuration
 public class HttpInterfaceConfig {
 
+  /** Eureka service id, resolved by the load-balanced builder. */
   private static final String USER_SERVICE_URL = "http://user-service";
 
   @Bean

@@ -41,7 +41,8 @@ public class SubscriptionAuthorizationInterceptor implements ChannelInterceptor 
           "User {} attempted to subscribe to forbidden destination {}",
           accessor.getUser().getName(),
           destination);
-      throw new MessageDeliveryException(message, "Subscription to this destination is not allowed");
+      throw new MessageDeliveryException(
+          message, "Subscription to this destination is not allowed");
     }
     return message;
   }

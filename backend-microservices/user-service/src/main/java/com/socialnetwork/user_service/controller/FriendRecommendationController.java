@@ -1,16 +1,20 @@
 package com.socialnetwork.user_service.controller;
 
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.vo.PageVO;
 import com.socialnetwork.user_service.dto.UserRelationDto;
 import com.socialnetwork.user_service.service.FriendRecommendationService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.socialnetwork.common.vo.PageVO;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping(ApiConstants.USERS)
 @RequiredArgsConstructor
 public class FriendRecommendationController {
 
@@ -18,14 +22,7 @@ public class FriendRecommendationController {
 
   @GetMapping("/{userId}/recommendations")
   public ResponseEntity<PageVO<UserRelationDto>> getFriendRecommendations(
-      @PathVariable Long userId,
-      @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "10") int size) {
-
-    Pageable pageable = PageRequest.of(page, size);
-    PageVO<UserRelationDto> recommendations =
-        friendRecommendationService.getFriendRecommendations(userId, pageable);
-
-    return ResponseEntity.ok(recommendations);
+      @PathVariable("userId") Long userId, @ParameterObject Pageable pageable) {
+    return ResponseEntity.ok(friendRecommendationService.getFriendRecommendations(userId, pageable));
   }
 }

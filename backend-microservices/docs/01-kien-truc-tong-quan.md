@@ -78,4 +78,28 @@ Tất cả service Java đều **stateless**, xác thực JWT tại chính servi
 - STOMP dùng **simple broker in-memory** ở chat & notification → chỉ chạy đúng với 1 instance mỗi service. Muốn scale cần broker relay (RabbitMQ) hoặc fan-out qua Redis/Kafka.
 - Chưa có outbox pattern; publish-after-commit giảm nhưng không loại bỏ hoàn toàn mất event khi Kafka down đúng lúc.
 - Eureka và ai-service không có xác thực; chỉ dùng trong mạng nội bộ/docker network.
-- `ddl-auto: update` ở dev; prod dùng `validate` — chưa có Flyway/Liquibase.
+- `ddl-auto: update` ở dev; prod dùng `validate` — **chưa có Flyway/Liquibase**, nên thay đổi schema phải chạy migration thủ công trước khi deploy prod.
+- Gateway không xác thực JWT tại edge (mỗi service tự làm), nên các service phải nằm trong mạng nội bộ để không bị gọi vòng qua gateway.
+- Neo4j là instance dùng chung giữa user-service và media-service — vi phạm nhẹ nguyên tắc database-per-service, chấp nhận vì cùng một đồ thị xã hội.
+
+## 7. Tình trạng kiểm thử
+
+Toàn bộ reactor build và test được **offline**, không cần hạ tầng (H2 + mock client ngoài + `@EmbeddedKafka`):
+
+| Module | Số test |
+|---|---|
+| common | 13 |
+| discovery-server | 1 |
+| api-gateway | 35 |
+| auth-service | 50 |
+| user-service | 20 |
+| media-service | 17 |
+| notification-service | 45 |
+| chat-service | 40 |
+| moderation-service | 28 |
+| **Tổng** | **249** |
+
+```bash
+mvn clean install     # build + test tất cả
+mvn -o test           # chạy lại test offline
+```

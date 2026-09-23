@@ -9,6 +9,6 @@ import com.socialnetwork.common.vo.TargetType;
 @Builder
 public class ReactRequest {
   private Long targetId;
-  private TargetType targetType; // "POST", "COMMENT", etc.
+  private TargetType targetType;
   private Long reactTypeId;
 }

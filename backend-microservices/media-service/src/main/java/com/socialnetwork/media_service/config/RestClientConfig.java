@@ -2,8 +2,10 @@ package com.socialnetwork.media_service.config;
 
 import com.socialnetwork.common.security.InternalTokenInterceptor;
 import java.time.Duration;
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.util.Timeout;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
@@ -13,14 +15,21 @@ import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
+/**
+ * The two {@link RestClient.Builder} flavours this service needs: a plain one for absolute URLs
+ * (Eureka transport, ai-service) and a load-balanced one for calls to other services.
+ */
 @Configuration
 public class RestClientConfig {
 
   public static final String LOAD_BALANCED_BUILDER = "loadBalancedRestClientBuilder";
 
+  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
+  private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
+
   /**
-   * Plain builder for direct URLs (Eureka transport, ai-service). Marked primary so the discovery
-   * client does not pick up the load-balanced one.
+   * Plain builder for direct URLs. Marked primary so the discovery client does not pick up the
+   * load-balanced one.
    */
   @Bean
   @Primary
@@ -36,19 +45,30 @@ public class RestClientConfig {
   @LoadBalanced
   public RestClient.Builder loadBalancedRestClientBuilder(InternalTokenInterceptor interceptor) {
     return RestClient.builder()
-        .requestFactory(requestFactory(Duration.ofSeconds(2), Duration.ofSeconds(5)))
+        .requestFactory(requestFactory(CONNECT_TIMEOUT, RESPONSE_TIMEOUT))
         .requestInterceptor(interceptor);
   }
 
+  /**
+   * HttpClient5 request factory. The TCP connect timeout belongs to the connection manager; the
+   * response timeout belongs to the request config.
+   */
   public static ClientHttpRequestFactory requestFactory(Duration connect, Duration response) {
-    RequestConfig requestConfig =
+    var connectionManager =
+        PoolingHttpClientConnectionManagerBuilder.create()
+            .setDefaultConnectionConfig(
+                ConnectionConfig.custom().setConnectTimeout(Timeout.of(connect)).build())
+            .build();
+    var requestConfig =
         RequestConfig.custom()
             .setConnectionRequestTimeout(Timeout.of(connect))
             .setResponseTimeout(Timeout.of(response))
             .build();
-    var httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build();
-    var factory = new HttpComponentsClientHttpRequestFactory(httpClient);
-    factory.setConnectTimeout(connect);
-    return factory;
+    var httpClient =
+        HttpClients.custom()
+            .setConnectionManager(connectionManager)
+            .setDefaultRequestConfig(requestConfig)
+            .build();
+    return new HttpComponentsClientHttpRequestFactory(httpClient);
   }
 }

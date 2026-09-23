@@ -25,7 +25,8 @@ import lombok.experimental.SuperBuilder;
       @Index(name = "ix_notifications_receiver_created", columnList = "receiver_id, created_at"),
       @Index(name = "ix_notifications_receiver_read", columnList = "receiver_id, is_read")
     },
-    uniqueConstraints = @UniqueConstraint(name = "uk_notifications_event_id", columnNames = "event_id"))
+    uniqueConstraints =
+        @UniqueConstraint(name = "uk_notifications_event_id", columnNames = "event_id"))
 @Getter
 @Setter
 @NoArgsConstructor

@@ -15,21 +15,31 @@ public interface UserRelaRepository extends JpaRepository<UserRela, Long> {
 
   boolean existsByFollowerAndFollowing(User follower, User following);
 
-  @Modifying
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query("DELETE FROM UserRela u WHERE u.follower = :follower AND u.following = :following")
   void deleteByFollowerAndFollowing(
       @Param("follower") User follower, @Param("following") User following);
 
-  // Lấy danh sách các quan hệ follow mà user là follower (những người user đang follow)
+  /** Drops both directions of a follow in one statement (unfriend, block). */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      """
+      DELETE FROM UserRela u
+      WHERE (u.follower.id = :user1 AND u.following.id = :user2)
+         OR (u.follower.id = :user2 AND u.following.id = :user1)
+      """)
+  void deleteFollowsBetween(@Param("user1") Long user1, @Param("user2") Long user2);
+
+  /** Follow edges where this user is the follower. */
   List<UserRela> findByFollower(User follower);
 
-  // [MỚI THÊM] Lấy danh sách ID những người mà TÔI (viewerId) đang follow trong tập targetIds
+  /** Of {@code targetIds}, the ones the viewer follows. */
   @Query(
       "SELECT r.following.id FROM UserRela r WHERE r.follower.id = :viewerId AND r.following.id IN :targetIds")
   Set<Long> findFollowingIdsByViewerAndTargets(
       @Param("viewerId") Long viewerId, @Param("targetIds") List<Long> targetIds);
 
-  // [MỚI THÊM] Lấy danh sách ID những người đang follow TÔI (viewerId) trong tập targetIds
+  /** Of {@code targetIds}, the ones that follow the viewer. */
   @Query(
       "SELECT r.follower.id FROM UserRela r WHERE r.following.id = :viewerId AND r.follower.id IN :targetIds")
   Set<Long> findFollowerIdsByViewerAndTargets(

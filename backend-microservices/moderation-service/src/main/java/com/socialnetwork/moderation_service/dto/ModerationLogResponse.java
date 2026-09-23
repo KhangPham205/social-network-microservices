@@ -1,23 +1,27 @@
 package com.socialnetwork.moderation_service.dto;
 
+import com.socialnetwork.common.vo.TargetType;
+import com.socialnetwork.moderation_service.enums.ModerationLogAction;
 import java.time.Instant;
 import lombok.Builder;
 import lombok.Data;
-import com.socialnetwork.common.vo.TargetType;
 
+/** One row of the moderation audit trail. */
 @Data
 @Builder
 public class ModerationLogResponse {
   private Long id;
-  private TargetType targetType; // POST, COMMENT, USER
-  private String targetId; // ID of moderated object
-  private String action; // AUTO_BAN, ADMIN_BAN, ADMIN_RESTORE
-  private String reason; // Reason
+  private TargetType targetType;
+  private String targetId;
+  private ModerationLogAction action;
+  private String reason;
 
-  // Actor information
   private Long actorId;
-  private String actorName; // null -> "System (AI)"
-  private String actorAvatar;
+  /** Display name of the actor, or {@code System (AI)} for automated decisions. */
+  private String actorName;
+
+  private Long reportId;
+  private Long complaintId;
 
   private Instant createdAt;
 }

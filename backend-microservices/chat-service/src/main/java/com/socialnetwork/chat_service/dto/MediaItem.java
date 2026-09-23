@@ -1,16 +1,14 @@
 package com.socialnetwork.chat_service.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class MediaItem {
-  private String url;
-  private String type;
-  private String name; // Tên file (optional)
-}
+/**
+ * One attachment already uploaded to media-service; chat-service only stores the descriptor.
+ *
+ * @param type MIME type or coarse kind ("image", "video", ...)
+ */
+public record MediaItem(
+    @NotBlank @Size(max = 2048) String url,
+    @Size(max = 100) String type,
+    @Size(max = 255) String name) {}

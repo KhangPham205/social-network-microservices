@@ -1,0 +1,173 @@
+# The eight Java modules, built from backend-microservices/Dockerfile.
+# Always combine it with the infrastructure file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.services.yml up --build
+#
+# Only the gateway (8080) and the Eureka dashboard (8761) are published; every other service is
+# reachable only inside the compose network, which is also what makes /internal/** endpoints safe.
+
+name: social-network
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks: [social-network-net]
+  depends_on:
+    discovery-server: {condition: service_healthy}
+
+x-jvm-env: &jvm-env
+  EUREKA_URL: http://discovery-server:8761/eureka/
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9094
+  JWT_SECRET: ${JWT_SECRET}
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+  DB_USERNAME: ${POSTGRES_USER}
+  DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+services:
+  discovery-server:
+    <<: *service-defaults
+    build:
+      context: ..
+      args: {MODULE: discovery-server}
+    container_name: discovery-server
+    depends_on: []
+    ports: ["8761:8761"]
+    environment:
+      SERVER_PORT: 8761
+      EUREKA_HOSTNAME: discovery-server
+
+  api-gateway:
+    <<: *service-defaults
+    build:
+      context: ..
+      args: {MODULE: api-gateway}
+    container_name: api-gateway
+    ports: ["8080:8080"]
+    environment:
+      <<: *jvm-env
+      SERVER_PORT: 8080
+
+  auth-service:
+    <<: *service-defaults
+    build:
+      context: ..
+      args: {MODULE: auth-service}
+    container_name: auth-service
+    environment:
+      <<: *jvm-env
+      SERVER_PORT: 8081
+      DB_URL: jdbc:postgresql://postgres-auth:5432/auth_db
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    depends_on:
+      discovery-server: {condition: service_healthy}
+      postgres-auth: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+
+  user-service:
+    <<: *service-defaults
+    build:
+      context: ..
+      args: {MODULE: user-service}
+    container_name: user-service
+    environment:
+      <<: *jvm-env
+      SERVER_PORT: 8082
+      DB_URL: jdbc:postgresql://postgres-user:5432/user_db
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+    depends_on:
+      discovery-server: {condition: service_healthy}
+      postgres-user: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+      neo4j: {condition: service_healthy}
+
+  media-service:
+    <<: *service-defaults
+    build:
+      context: ..
+      args: {MODULE: media-service}
+    container_name: media-service
+    environment:
+      <<: *jvm-env
+      SERVER_PORT: 8083
+      DB_URL: jdbc:postgresql://postgres-media:5432/media_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      # URL the browser uses to fetch media; point it at your public MinIO endpoint in production.
+      MINIO_PUBLIC_URL: http://localhost:9000
+      MILVUS_URI: http://milvus-standalone:19530
+      AI_SERVICE_URL: http://ai-service:5000
+    depends_on:
+      discovery-server: {condition: service_healthy}
+      postgres-media: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      neo4j: {condition: service_healthy}
+      minio: {condition: service_healthy}
+
+  notification-service:
+    <<: *service-defaults
+    build:
+      context: ..
+      args: {MODULE: notification-service}
+    container_name: notification-service
+    environment:
+      <<: *jvm-env
+      SERVER_PORT: 8084
+      DB_URL: jdbc:postgresql://postgres-noti:5432/notification_db
+    depends_on:
+      discovery-server: {condition: service_healthy}
+      postgres-noti: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+
+  chat-service:
+    <<: *service-defaults
+    build:
+      context: ..
+      args: {MODULE: chat-service}
+    container_name: chat-service
+    environment:
+      <<: *jvm-env
+      SERVER_PORT: 8085
+      DB_URL: jdbc:postgresql://postgres-chat:5432/chat_db
+      MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/chat_mongo_db?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      discovery-server: {condition: service_healthy}
+      postgres-chat: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+      mongodb: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  moderation-service:
+    <<: *service-defaults
+    build:
+      context: ..
+      args: {MODULE: moderation-service}
+    container_name: moderation-service
+    environment:
+      <<: *jvm-env
+      SERVER_PORT: 8086
+      DB_URL: jdbc:postgresql://postgres-moderation:5432/moderation_db
+      AI_SERVICE_URL: http://ai-service:5000
+    depends_on:
+      discovery-server: {condition: service_healthy}
+      postgres-moderation: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+      ai-service: {condition: service_healthy}
+
+networks:
+  social-network-net:
+    driver: bridge

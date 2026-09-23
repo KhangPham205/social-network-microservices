@@ -10,32 +10,28 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/** OpenAPI document for this service; served through the gateway's aggregated Swagger UI. */
 @Configuration
 public class OpenApiConfig {
 
+  private static final String SECURITY_SCHEME = "bearerAuth";
+
   @Bean
   public OpenAPI moderationServiceOpenAPI() {
-    // Tên của scheme bảo mật (dùng nội bộ trong code)
-    String securitySchemeName = "bearerAuth";
-
     return new OpenAPI()
-        // Thêm cấu hình Server để Gateway có thể định tuyến đúng (Rất quan trọng trong
-        // Microservices)
         .servers(List.of(new Server().url("/").description("Default Server URL")))
         .info(
             new Info()
                 .title("Moderation Service API")
-                .description("Tài liệu API cho module Moderation (Moderation Service)")
+                .description("Reports, complaints, moderation log and the admin composition API")
                 .version("v1.0.0"))
-        // Yêu cầu bảo mật cho toàn bộ các API
-        .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
-        // Định nghĩa ổ khóa JWT
+        .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME))
         .components(
             new Components()
                 .addSecuritySchemes(
-                    securitySchemeName,
+                    SECURITY_SCHEME,
                     new SecurityScheme()
-                        .name(securitySchemeName)
+                        .name(SECURITY_SCHEME)
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
                         .bearerFormat("JWT")));

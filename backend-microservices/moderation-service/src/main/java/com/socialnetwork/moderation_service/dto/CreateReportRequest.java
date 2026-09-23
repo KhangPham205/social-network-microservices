@@ -1,13 +1,20 @@
 package com.socialnetwork.moderation_service.dto;
 
-import com.socialnetwork.moderation_service.enums.ReportReason;
-import lombok.Data;
 import com.socialnetwork.common.vo.TargetType;
+import com.socialnetwork.moderation_service.enums.ReportReason;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
 
 @Data
 public class CreateReportRequest {
-  private TargetType targetType; // POST, COMMENT, USER, MESSAGE
-  private String targetId;
-  private ReportReason reason;
-  private String customReason; // If reason is OTHER
+
+  @NotNull private TargetType targetType;
+
+  @NotBlank private String targetId;
+
+  @NotNull private ReportReason reason;
+
+  /** Only kept when {@code reason} is {@code OTHER}. */
+  private String customReason;
 }

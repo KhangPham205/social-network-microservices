@@ -1,44 +1,60 @@
 package com.socialnetwork.moderation_service.model;
 
+import com.socialnetwork.common.entity.BaseEntity;
+import com.socialnetwork.common.vo.TargetType;
 import com.socialnetwork.moderation_service.enums.ReportReason;
+import com.socialnetwork.moderation_service.enums.ReportSource;
 import com.socialnetwork.moderation_service.enums.ReportStatus;
-import jakarta.persistence.*;
-import java.time.Instant;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import com.socialnetwork.common.vo.TargetType;
+import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
+/**
+ * One report against a post, comment, message or user. A report is either filed by a user
+ * ({@code source = USER}, {@code reporterId} set) or by the AI moderation pipeline
+ * ({@code source = SYSTEM}, {@code reporterId} null).
+ */
 @Entity
 @Table(name = "reports")
-@Data
-@Builder
+@Getter
+@Setter
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Report {
+public class Report extends BaseEntity {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
-
-  // Store reporter ID instead of entity reference
-  @Column(name = "reporter_id", nullable = false)
+  /** Null for reports raised by the system. */
+  @Column(name = "reporter_id")
   private Long reporterId;
-
-  @Column(name = "status")
-  private ReportStatus status;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
-  private TargetType targetType; // POST, COMMENT, MESSAGE, USER
+  @Builder.Default
+  private ReportSource source = ReportSource.USER;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  @Builder.Default
+  private ReportStatus status = ReportStatus.PENDING;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private TargetType targetType;
 
   @Column(nullable = false)
-  private String targetId; // ID of reported content
+  private String targetId;
 
+  /** Owner of the reported content. */
   @Column(name = "target_user_id", nullable = false)
-  private Long targetUserId; // ID of content owner
+  private Long targetUserId;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
@@ -46,9 +62,7 @@ public class Report {
 
   private String customReason;
 
-  private Boolean isBannedBySystem = false;
-
-  @CreationTimestamp
-  @Column(updatable = false)
-  private Instant createdAt;
+  @Column(name = "is_banned_by_system", nullable = false)
+  @Builder.Default
+  private boolean bannedBySystem = false;
 }

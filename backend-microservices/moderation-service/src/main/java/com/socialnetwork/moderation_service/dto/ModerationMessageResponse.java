@@ -1,15 +1,16 @@
 package com.socialnetwork.moderation_service.dto;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
 
+/** Admin view of a chat message, composed from chat-service and the local report counters. */
 @Data
 @Builder
 public class ModerationMessageResponse {
-  private String id; // ID tin nhắn (UUID)
+  /** Mongo ObjectId of the message. */
+  private String id;
+
   private Long conversationId;
 
   private Long senderId;
@@ -17,11 +18,8 @@ public class ModerationMessageResponse {
   private String senderAvatar;
 
   private String content;
-  private String sentAt; // Timestamp trong JSON thường là String
+  private Instant sentAt;
 
-  private List<Map<String, Object>> media;
-
-  private Instant deletedAt;
   private Boolean isSystemBan;
 
   private long reportCount;

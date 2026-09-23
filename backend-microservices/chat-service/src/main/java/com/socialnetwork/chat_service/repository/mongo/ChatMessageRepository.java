@@ -10,18 +10,16 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ChatMessageRepository extends MongoRepository<ChatMessage, String> {
-  // Lấy tin nhắn mới nhất của một phòng (dùng để hiển thị ở danh sách hội thoại)
+
+  /** Last message of a room, for the conversation list preview. */
   Optional<ChatMessage> findFirstByRoomIdOrderByCreatedAtDesc(Long roomId);
 
-  // Xử lý Cursor Paging
+  /** Cursor page: everything older than {@code cursorId}. */
   Slice<ChatMessage> findByRoomIdAndIdLessThanOrderByCreatedAtDesc(
       Long roomId, String cursorId, Pageable pageable);
 
-  // Lấy trang đầu tiên (khi chưa có cursor)
+  /** Newest page, when the client has no cursor yet. */
   Slice<ChatMessage> findByRoomIdOrderByCreatedAtDesc(Long roomId, Pageable pageable);
 
-  List<ChatMessage> findByRoomIdOrderByCreatedAtAsc(Long roomId);
-
-  // Đổi Asc thành Desc
-  List<ChatMessage> findByRoomIdOrderByCreatedAtDesc(Long roomId);
+  List<ChatMessage> findByIdIn(List<String> ids);
 }

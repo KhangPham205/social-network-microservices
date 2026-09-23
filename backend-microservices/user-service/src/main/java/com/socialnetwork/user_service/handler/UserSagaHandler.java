@@ -1,35 +1,38 @@
 package com.socialnetwork.user_service.handler;
 
-import com.socialnetwork.user_service.service.UserService;
-import com.socialnetwork.common.events.ProfileCreatedEvent;
-import com.socialnetwork.common.events.ProfileFailedEvent;
+import com.socialnetwork.common.constants.KafkaTopics;
+import com.socialnetwork.common.dto.UserSummary;
 import com.socialnetwork.common.events.UserCreatedEvent;
+import com.socialnetwork.user_service.event.EventPublisher;
+import com.socialnetwork.user_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-@Service
+/**
+ * Registration saga, user-service side: create the profile for a freshly created account and answer
+ * auth-service. Redeliveries are expected, so {@code createDefaultProfile} is idempotent and a
+ * profile that already exists simply gets its reply re-published.
+ */
+@Component
 @RequiredArgsConstructor
 @Slf4j
 public class UserSagaHandler {
 
   private final UserService userService;
-  private final KafkaTemplate<String, Object> kafkaTemplate;
+  private final EventPublisher eventPublisher;
 
-  // ĐỔI SANG GROUP v3 ĐỂ ÉP ĐỌC LẠI TỪ ĐẦU
-  @KafkaListener(topics = "user-created-topic", groupId = "user-service-group")
+  @KafkaListener(topics = KafkaTopics.USER_CREATED)
   public void handleUserCreatedEvent(UserCreatedEvent event) {
-    log.info("Received UserCreatedEvent for accountId: {}", event.accountId());
-
+    log.info("Received UserCreatedEvent for accountId {}", event.accountId());
     try {
-      userService.createDefaultProfile(event.accountId(), event.username());
-      kafkaTemplate.send("profile-created-topic", new ProfileCreatedEvent(event.accountId()));
+      UserSummary summary = userService.createDefaultProfile(event.accountId(), event.username());
+      eventPublisher.publishProfileCreated(summary.id());
     } catch (Exception e) {
-      log.error("Failed to create profile for accountId: {}", event.accountId(), e);
-      kafkaTemplate.send(
-          "profile-failed-topic", new ProfileFailedEvent(event.accountId(), e.getMessage()));
+      // The saga owns the failure path: auth-service compensates on ProfileFailedEvent.
+      log.error("Failed to create the profile for accountId {}", event.accountId(), e);
+      eventPublisher.publishProfileFailed(event.accountId(), e.getMessage());
     }
   }
 }

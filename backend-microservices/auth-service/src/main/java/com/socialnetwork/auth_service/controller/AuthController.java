@@ -1,19 +1,39 @@
 package com.socialnetwork.auth_service.controller;
 
-import com.socialnetwork.auth_service.dto.*;
-import com.socialnetwork.auth_service.security.JwtProvider;
+import com.socialnetwork.auth_service.dto.LoginRequest;
+import com.socialnetwork.auth_service.dto.LoginResponse;
+import com.socialnetwork.auth_service.dto.OtpVerificationRequest;
+import com.socialnetwork.auth_service.dto.PasswordResetRequest;
+import com.socialnetwork.auth_service.dto.RefreshTokenResponse;
+import com.socialnetwork.auth_service.dto.RegisterRequest;
+import com.socialnetwork.auth_service.dto.RegisterResponse;
+import com.socialnetwork.auth_service.dto.SendVerifyEmailRequest;
+import com.socialnetwork.auth_service.security.AuthCookieFactory;
 import com.socialnetwork.auth_service.service.AuthService;
 import com.socialnetwork.auth_service.service.PasswordResetService;
 import com.socialnetwork.auth_service.service.RefreshTokenService;
 import com.socialnetwork.common.constants.ApiConstants;
-import jakarta.ws.rs.core.HttpHeaders;
-import java.util.List;
+import com.socialnetwork.common.constants.SecurityConstants;
+import com.socialnetwork.common.exception.InvalidCredentialsException;
+import jakarta.validation.Valid;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseCookie;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.lang.Nullable;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Anonymous entry points of the authentication flow. Tokens are returned both in the body (for
+ * native clients) and as HttpOnly cookies (for the browser); errors are rendered by the shared
+ * {@code GlobalExceptionHandler}.
+ */
 @RestController
 @RequestMapping(ApiConstants.AUTH)
 @RequiredArgsConstructor
@@ -22,156 +42,100 @@ public class AuthController {
   private final AuthService authService;
   private final RefreshTokenService refreshTokenService;
   private final PasswordResetService passwordResetService;
-  private final JwtProvider jwtProvider;
+  private final AuthCookieFactory cookieFactory;
 
   @PostMapping("/register")
-  public ResponseEntity<RegisterResponse> register(@RequestBody RegisterRequest request) {
+  public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
     return ResponseEntity.ok(authService.register(request));
   }
 
   @PostMapping("/login")
-  public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+  public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
     LoginResponse response = authService.login(request);
-
-    ResponseCookie jwtCookie =
-        ResponseCookie.from("jwt", response.getToken().getAccessToken())
-            .httpOnly(true)
-            .secure(true)
-            .path("/")
-            .maxAge(7 * 24 * 60 * 60) // 7 days
-            .sameSite("None")
-            .build();
-
-    ResponseCookie refreshCookie =
-        ResponseCookie.from("refreshToken", response.getToken().getRefreshToken())
-            .httpOnly(true)
-            .secure(true)
-            .path("/")
-            .maxAge(30 * 24 * 60 * 60) // 30 days
-            .sameSite("None")
-            .build();
-
-    //    response.setToken(null);
-
     return ResponseEntity.ok()
         .headers(
-            headers -> {
-              headers.add(HttpHeaders.SET_COOKIE, jwtCookie.toString());
-              headers.add(HttpHeaders.SET_COOKIE, refreshCookie.toString());
-            })
+            headers ->
+                cookieFactory.write(
+                    headers,
+                    cookieFactory.accessToken(response.getToken().getAccessToken()),
+                    cookieFactory.refreshToken(response.getToken().getRefreshToken())))
         .body(response);
   }
 
   @PostMapping("/logout")
-  public ResponseEntity<?> logout(@CookieValue(name = "jwt", required = false) String jwt) {
+  public ResponseEntity<Map<String, String>> logout(
+      @RequestHeader(name = HttpHeaders.AUTHORIZATION, required = false) @Nullable
+          String authorization,
+      @CookieValue(name = SecurityConstants.JWT_COOKIE, required = false) @Nullable String jwt,
+      @CookieValue(name = SecurityConstants.REFRESH_TOKEN_COOKIE, required = false) @Nullable
+          String refreshToken) {
 
-    if (jwt != null && !jwt.isEmpty()) {
-      authService.logout(jwt);
-    }
-
-    ResponseCookie cleanJwtCookie =
-        ResponseCookie.from("jwt", "")
-            .httpOnly(true)
-            .secure(true)
-            .path("/")
-            .sameSite("None")
-            .maxAge(0)
-            .build();
-
-    ResponseCookie cleanRefreshCookie =
-        ResponseCookie.from("refreshToken", "")
-            .httpOnly(true)
-            .secure(true)
-            .path("/")
-            .sameSite("None")
-            .maxAge(0)
-            .build();
+    authService.logout(bearerOrCookie(authorization, jwt), refreshToken);
 
     return ResponseEntity.ok()
         .headers(
-            headers -> {
-              headers.add(HttpHeaders.SET_COOKIE, cleanJwtCookie.toString());
-              headers.add(HttpHeaders.SET_COOKIE, cleanRefreshCookie.toString());
-            })
-        .body("Logged out successfully");
+            headers ->
+                cookieFactory.write(
+                    headers, cookieFactory.clearAccessToken(), cookieFactory.clearRefreshToken()))
+        .body(Map.of("message", "Logged out successfully"));
   }
 
   @PostMapping("/refresh")
-  public ResponseEntity<?> refresh(
-      @CookieValue(name = "refreshToken", required = false) String refreshToken) {
-    if (refreshToken == null || refreshToken.isEmpty()) {
-      return ResponseEntity.status(401).body("Missing refresh token cookie");
+  public ResponseEntity<RefreshTokenResponse> refresh(
+      @CookieValue(name = SecurityConstants.REFRESH_TOKEN_COOKIE, required = false) @Nullable
+          String refreshToken) {
+    if (!StringUtils.hasText(refreshToken)) {
+      throw new InvalidCredentialsException("Missing refresh token");
     }
 
-    TokenResponse newTokens = refreshTokenService.refresh(new RefreshTokenRequest(refreshToken));
-
-    ResponseCookie newJwtCookie =
-        ResponseCookie.from("jwt", newTokens.getAccessToken())
-            .httpOnly(true)
-            .secure(true)
-            .path("/")
-            .maxAge(24 * 60 * 60)
-            .sameSite("None")
-            .build();
-
-    ResponseCookie newRefreshCookie =
-        ResponseCookie.from("refreshToken", newTokens.getRefreshToken())
-            .httpOnly(true)
-            .secure(true)
-            .path("/")
-            .maxAge(7 * 24 * 60 * 60)
-            .sameSite("None")
-            .build();
-
-    List<String> userRole = jwtProvider.extractRoles(newTokens.getAccessToken());
-
+    RefreshTokenResponse response = refreshTokenService.refresh(refreshToken);
     return ResponseEntity.ok()
         .headers(
-            headers -> {
-              headers.add(HttpHeaders.SET_COOKIE, newJwtCookie.toString());
-              headers.add(HttpHeaders.SET_COOKIE, newRefreshCookie.toString());
-            })
-        .body(new RefreshTokenResponse("Token refreshed successfully", newTokens, userRole));
+            headers ->
+                cookieFactory.write(
+                    headers,
+                    cookieFactory.accessToken(response.getTokenResponse().getAccessToken()),
+                    cookieFactory.refreshToken(response.getTokenResponse().getRefreshToken())))
+        .body(response);
   }
 
   @PostMapping("/sendVerifyEmail")
-  public ResponseEntity<?> sendVerifyEmail(@RequestBody SendVerifyEmailRequest request) {
-    try {
-      authService.sendVerificationCode(request.getEmail());
-      return ResponseEntity.ok(Map.of("message", "Verification code sent successfully"));
-    } catch (Exception e) {
-      return ResponseEntity.badRequest().body(e.getMessage());
-    }
+  public ResponseEntity<Map<String, String>> sendVerifyEmail(
+      @Valid @RequestBody SendVerifyEmailRequest request) {
+    authService.sendVerificationCode(request.getEmail());
+    return ResponseEntity.ok(Map.of("message", "Verification code sent successfully"));
   }
 
+  /** Same behaviour as {@code /sendVerifyEmail}: a new code replaces the outstanding one. */
   @PostMapping("/resendVerifyEmail")
-  public ResponseEntity<?> resendVerifyEmail(@RequestBody SendVerifyEmailRequest request) {
-    try {
-      authService.resendVerificationCode(request.getEmail());
-      return ResponseEntity.ok(Map.of("message", "Verification code resent successfully"));
-    } catch (Exception e) {
-      return ResponseEntity.badRequest().body(e.getMessage());
-    }
+  public ResponseEntity<Map<String, String>> resendVerifyEmail(
+      @Valid @RequestBody SendVerifyEmailRequest request) {
+    authService.sendVerificationCode(request.getEmail());
+    return ResponseEntity.ok(Map.of("message", "Verification code resent successfully"));
   }
 
   @PostMapping("/reset-password")
   public ResponseEntity<Map<String, String>> resetPassword(
-      @RequestBody PasswordResetRequest request) {
-    try {
-      passwordResetService.sendResetCode(request);
-      return ResponseEntity.ok(Map.of("message", "Password reset code sent (simulated)"));
-    } catch (Exception e) {
-      return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-    }
+      @Valid @RequestBody PasswordResetRequest request) {
+    passwordResetService.sendResetCode(request);
+    return ResponseEntity.ok(Map.of("message", "Password reset code sent"));
   }
 
   @PostMapping("/verify-otp")
-  public ResponseEntity<?> verifyOtp(@RequestBody OtpVerificationRequest request) {
-    boolean success = authService.verifyOtp(request);
-    if (success) {
+  public ResponseEntity<Map<String, String>> verifyOtp(
+      @Valid @RequestBody OtpVerificationRequest request) {
+    if (authService.verifyOtp(request)) {
       return ResponseEntity.ok(Map.of("message", "OTP verified successfully"));
-    } else {
-      return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired OTP"));
     }
+    return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired OTP"));
+  }
+
+  /** Access token of the caller: {@code Authorization: Bearer ...} first, then the jwt cookie. */
+  @Nullable
+  private static String bearerOrCookie(@Nullable String authorization, @Nullable String jwtCookie) {
+    if (authorization != null && authorization.startsWith(SecurityConstants.BEARER_PREFIX)) {
+      return authorization.substring(SecurityConstants.BEARER_PREFIX.length()).trim();
+    }
+    return jwtCookie;
   }
 }

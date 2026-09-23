@@ -10,6 +10,10 @@ import org.springframework.data.neo4j.core.transaction.Neo4jTransactionManager;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
 
+/**
+ * Two stores mean two transaction managers. JPA stays primary so {@code @Transactional} without a
+ * qualifier keeps its usual meaning; the Neo4j one is referenced by name from the repositories.
+ */
 @Configuration
 public class Neo4jConfig {
 

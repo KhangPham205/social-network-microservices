@@ -1,13 +1,17 @@
 package com.socialnetwork.chat_service.client;
 
-import com.socialnetwork.chat_service.dto.UserProfileDto;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.service.annotation.GetExchange;
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.dto.UserSummary;
+import java.util.List;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.service.annotation.HttpExchange;
+import org.springframework.web.service.annotation.PostExchange;
 
-@HttpExchange("/api/v1/users/internal")
+/** user-service internal API, protected by the shared internal token. */
+@HttpExchange(ApiConstants.USERS + ApiConstants.INTERNAL)
 public interface UserClient {
 
-  @GetExchange("/{userId}")
-  UserProfileDto getUserProfile(@PathVariable("userId") Long userId);
+  /** One round trip for every participant of a conversation. */
+  @PostExchange("/summaries")
+  List<UserSummary> getSummaries(@RequestBody List<Long> ids);
 }

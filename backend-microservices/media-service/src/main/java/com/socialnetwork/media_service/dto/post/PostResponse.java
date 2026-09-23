@@ -25,7 +25,7 @@ public class PostResponse {
   private String authorAvatar;
   private Long authorId;
 
-  // Nếu bài gốc không khả dụng => null
+  /** Original post of a share; null when the viewer may not see it. */
   private Long sharedPostId;
   private PostResponse sharedPost;
 

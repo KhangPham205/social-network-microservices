@@ -1,14 +1,20 @@
 package com.socialnetwork.moderation_service.model;
 
 import com.socialnetwork.common.entity.BaseEntity;
-import jakarta.persistence.*;
+import com.socialnetwork.common.vo.TargetType;
+import com.socialnetwork.moderation_service.enums.ModerationLogAction;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
-import com.socialnetwork.common.vo.TargetType;
 
+/** Audit trail: exactly one row per moderation action taken by this service. */
 @Entity
 @Table(name = "moderation_logs")
 @Getter
@@ -19,15 +25,27 @@ import com.socialnetwork.common.vo.TargetType;
 public class ModerationLog extends BaseEntity {
 
   @Enumerated(EnumType.STRING)
-  private TargetType targetType; // POST, COMMENT, USER
+  @Column(nullable = false)
+  private TargetType targetType;
 
+  @Column(nullable = false)
   private String targetId;
 
-  private String action; // AUTO_BAN, ADMIN_BAN, ADMIN_RESTORE
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private ModerationLogAction action;
 
   private String reason;
 
-  // Actor ID (who performed the action) - null if automated
+  /** Administrator who performed the action; null for automated decisions. */
   @Column(name = "actor_id")
   private Long actorId;
+
+  /** The report this action resolves, when there is one. */
+  @Column(name = "report_id")
+  private Long reportId;
+
+  /** The complaint this action resolves, when there is one. */
+  @Column(name = "complaint_id")
+  private Long complaintId;
 }

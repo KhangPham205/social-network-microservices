@@ -1,10 +1,19 @@
 package com.socialnetwork.chat_service.dto;
 
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.List;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class AddMembersRequest {
-  private Long conversationId;
+
+  @NotNull private Long conversationId;
+
+  @NotEmpty
+  @Size(max = 100)
   private List<Long> userIds;
 }

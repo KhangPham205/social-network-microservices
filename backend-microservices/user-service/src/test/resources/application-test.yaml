@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:user;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    # H2 runs in PostgreSQL mode; telling Hibernate so keeps the runtime dialect under test.
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  kafka:
+    bootstrap-servers: localhost:1
+    listener:
+      auto-startup: false
+  cloud:
+    discovery:
+      enabled: false
+
+eureka:
+  client:
+    enabled: false
+
+jwt:
+  secret: test-only-jwt-secret-0123456789abcdef0123456789abcdef
+
+app:
+  internal:
+    token: test-internal-token

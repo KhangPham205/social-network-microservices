@@ -17,7 +17,6 @@ public interface ReactRepository extends JpaRepository<React, Long> {
 
   long countByTargetIdAndTargetType(Long targetId, TargetType targetType);
 
-  // Thay User bằng UserCache
   Optional<React> findByUserAndTargetIdAndTargetType(
       UserCache user, Long targetId, TargetType targetType);
 

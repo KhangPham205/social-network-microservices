@@ -1,0 +1,23 @@
+# Build output and IDE state never belong in the build context.
+**/target/
+**/.idea/
+**/*.iml
+.git/
+.gitignore
+.gitattributes
+.mvn/
+mvnw
+mvnw.cmd
+
+# Docs and local tooling
+docs/
+infra/
+CLAUDE.md
+**/README.md
+
+# The AI service has its own Dockerfile and build context
+ai-service/
+
+# Local environment files
+**/.env
+docker/.env

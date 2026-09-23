@@ -8,7 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.socialnetwork.user_service.dto.AdminUserViewDto;
-import com.socialnetwork.user_service.enums.AccountStatus;
+import com.socialnetwork.common.vo.AccountStatus;
+import com.socialnetwork.user_service.service.Neo4jMigrationService;
 import com.socialnetwork.user_service.service.UserService;
 import java.util.List;
 import java.util.Set;
@@ -61,6 +62,7 @@ class AdminUserControllerTest {
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private UserService userService;
+  @MockitoBean private Neo4jMigrationService neo4jMigrationService;
 
   // ─────────────────────────────────────────────────────────────────
   //  Helpers – build test fixtures
@@ -109,7 +111,7 @@ class AdminUserControllerTest {
   // ─────────────────────────────────────────────────────────────────
 
   @Test
-  @WithMockUser
+  @WithMockUser(authorities = {"ROLE_ADMIN", "USER:READ_ALL", "USER:UPDATE_ANY"})
   @DisplayName("GET /admin (no filter) → 200 OK with composed user list (email + roles merged)")
   void givenNoFilter_whenGetAllUsers_thenReturnsComposedList() throws Exception {
     // --- Arrange ---
@@ -154,7 +156,7 @@ class AdminUserControllerTest {
   }
 
   @Test
-  @WithMockUser
+  @WithMockUser(authorities = {"ROLE_ADMIN", "USER:READ_ALL", "USER:UPDATE_ANY"})
   @DisplayName(
       "GET /admin?filter=… → filter is forwarded to service and results are paged correctly")
   void givenRsqlFilter_whenGetAllUsers_thenFilterForwardedToService() throws Exception {
@@ -179,7 +181,7 @@ class AdminUserControllerTest {
   }
 
   @Test
-  @WithMockUser
+  @WithMockUser(authorities = {"ROLE_ADMIN", "USER:READ_ALL", "USER:UPDATE_ANY"})
   @DisplayName("GET /admin → empty page when no users exist → returns 200 with empty content array")
   void givenNoUsers_whenGetAllUsers_thenReturnsEmptyPage() throws Exception {
     // --- Arrange ---
@@ -194,7 +196,7 @@ class AdminUserControllerTest {
   }
 
   @Test
-  @WithMockUser
+  @WithMockUser(authorities = {"ROLE_ADMIN", "USER:READ_ALL", "USER:UPDATE_ANY"})
   @DisplayName(
       "GET /admin → AuthClient data absent for one user → null email/roles in composed DTO")
   void givenAuthClientReturnsPartialData_whenGetAllUsers_thenNullFieldsAreAccepted()
@@ -217,7 +219,7 @@ class AdminUserControllerTest {
   }
 
   @Test
-  @WithMockUser
+  @WithMockUser(authorities = {"ROLE_ADMIN", "USER:READ_ALL", "USER:UPDATE_ANY"})
   @DisplayName("GET /admin?page=0&size=5 → pagination parameters forwarded to service")
   void givenPaginationParams_whenGetAllUsers_thenPageableForwardedCorrectly() throws Exception {
     // --- Arrange ---
@@ -239,7 +241,7 @@ class AdminUserControllerTest {
   }
 
   @Test
-  @WithMockUser
+  @WithMockUser(authorities = {"ROLE_ADMIN", "USER:READ_ALL", "USER:UPDATE_ANY"})
   @DisplayName("GET /admin → user with BLOCKED status is correctly returned")
   void givenBlockedUser_whenGetAllUsers_thenStatusIsPreserved() throws Exception {
     // --- Arrange ---
@@ -259,6 +261,6 @@ class AdminUserControllerTest {
     mockMvc
         .perform(get(ADMIN_USERS_URL).accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content[0].status").value("SUSPENDED"));
+        .andExpect(jsonPath("$.content[0].status").value("BLOCKED"));
   }
 }

@@ -1,22 +1,28 @@
 package com.socialnetwork.auth_service.controller;
 
+import com.socialnetwork.auth_service.config.SecurityConfig;
 import com.socialnetwork.auth_service.dto.CreateStaffRequest;
 import com.socialnetwork.auth_service.dto.RegisterResponse;
 import com.socialnetwork.auth_service.service.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+/** Staff provisioning. The whole path is restricted to {@code ROLE_ADMIN} by {@link SecurityConfig}. */
 @RestController
-@RequestMapping("/api/v1/auth/admin")
+@RequestMapping(SecurityConfig.ADMIN_PATH)
 @RequiredArgsConstructor
 public class AdminAuthController {
 
   private final AuthService authService;
 
   @PostMapping("/staff")
-  //  @PreAuthorize("hasAuthority('USER:CREATE')")
-  public ResponseEntity<RegisterResponse> createStaff(@RequestBody CreateStaffRequest request) {
+  public ResponseEntity<RegisterResponse> createStaff(
+      @Valid @RequestBody CreateStaffRequest request) {
     return ResponseEntity.ok(authService.createStaffAccount(request));
   }
 }

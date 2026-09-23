@@ -1,5 +1,7 @@
 package com.socialnetwork.media_service.controller;
 
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.security.SecurityUtils;
 import com.socialnetwork.media_service.service.RecommendationService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -10,15 +12,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/media/recommendations")
+@RequestMapping(ApiConstants.MEDIA + "/recommendations")
 @RequiredArgsConstructor
 public class RecommendationController {
 
   private final RecommendationService recommendationService;
 
+  /** Ranked post ids for the caller; the user always comes from the token, never from a param. */
   @GetMapping("/explore")
   public ResponseEntity<List<Long>> getExploreFeed(
-      @RequestParam Long currentUserId, @RequestParam(required = false) String filter) {
-    return ResponseEntity.ok(recommendationService.getExploreFeed(currentUserId, filter));
+      @RequestParam(value = "filter", required = false) String filter) {
+    return ResponseEntity.ok(
+        recommendationService.getExploreFeed(SecurityUtils.getCurrentUserId(), filter));
   }
 }

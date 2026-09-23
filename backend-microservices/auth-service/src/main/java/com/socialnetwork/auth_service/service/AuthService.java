@@ -20,7 +20,8 @@ public interface AuthService {
 
   /**
    * Revokes every refresh token of the caller. The user is resolved from the refresh-token cookie
-   * first, then from the (possibly expired) access token; both may be absent.
+   * and from the access token, which may already be expired; both arguments may be absent, in which
+   * case the call is a no-op.
    */
   void logout(@Nullable String accessToken, @Nullable String refreshToken);
 

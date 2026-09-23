@@ -13,7 +13,8 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class UserCache {
-  @Id private Long id; // Trùng với ID bên user-service
+  /** Same id as the user in user-service; this table is a read model, not a source. */
+  @Id private Long id;
 
   private String displayName;
   private String avatarUrl;

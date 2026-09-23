@@ -1,5 +1,7 @@
 package com.socialnetwork.media_service.controller;
 
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.vo.PageVO;
 import com.socialnetwork.media_service.dto.post.PostResponse;
 import com.socialnetwork.media_service.dto.post.UpdatePostRequest;
 import com.socialnetwork.media_service.enums.AccessScope;
@@ -13,12 +15,20 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import com.socialnetwork.common.vo.PageVO;
 
 @RestController
-@RequestMapping("/api/v1/media/posts")
+@RequestMapping(ApiConstants.MEDIA + "/posts")
 @RequiredArgsConstructor
 public class PostController {
 
@@ -26,17 +36,10 @@ public class PostController {
 
   @GetMapping("/feed")
   public ResponseEntity<PageVO<PostResponse>> getFeed(
-      @ParameterObject Pageable pageable, @RequestParam(required = false) String filter) {
+      @ParameterObject Pageable pageable,
+      @RequestParam(value = "filter", required = false) String filter) {
     return ResponseEntity.ok(postService.getFeed(pageable, filter));
   }
-
-  //    @GetMapping("/explore")
-  //    public ResponseEntity<PageVO<PostResponse>> getExploreFeed(
-  //            @RequestParam(defaultValue = "0") int page,
-  //            @RequestParam(defaultValue = "10") int size
-  //    ) {
-  //        return ResponseEntity.ok(postRecommendationService.getExploreFeed(page, size));
-  //    }
 
   @GetMapping("/{postId}")
   public ResponseEntity<PostResponse> getPostById(@PathVariable("postId") Long postId) {
@@ -60,9 +63,9 @@ public class PostController {
 
   @PostMapping("/share")
   public ResponseEntity<PostResponse> sharePost(
-      @RequestParam Long originalPostId,
-      @RequestParam(required = false) String caption,
-      @RequestParam AccessScope accessScope) {
+      @RequestParam("originalPostId") Long originalPostId,
+      @RequestParam(value = "caption", required = false) String caption,
+      @RequestParam("accessScope") AccessScope accessScope) {
     return ResponseEntity.ok(postService.sharePost(originalPostId, caption, accessScope));
   }
 
@@ -81,17 +84,5 @@ public class PostController {
   public ResponseEntity<Void> delete(@PathVariable("postId") Long postId) {
     postService.deletePost(postId);
     return ResponseEntity.noContent().build();
-  }
-
-  // ================= API NỘI BỘ CHO MODERATION SERVICE =================
-
-  @GetMapping("/{postId}/owner-id")
-  public ResponseEntity<Long> getPostOwnerId(@PathVariable("postId") Long postId) {
-    return ResponseEntity.ok(postService.getPostOwnerId(postId));
-  }
-
-  @PostMapping("/batch")
-  public ResponseEntity<List<PostResponse>> getPostsByIds(@RequestBody List<Long> ids) {
-    return ResponseEntity.ok(postService.getPostsByIds(ids));
   }
 }

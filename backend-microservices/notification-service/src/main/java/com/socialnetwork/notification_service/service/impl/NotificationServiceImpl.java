@@ -87,7 +87,11 @@ public class NotificationServiceImpl implements NotificationService {
   }
 
   private void persistAndPush(
-      String eventId, Long receiverId, UserCache actor, NotificationType type, Rendering rendering) {
+      String eventId,
+      Long receiverId,
+      UserCache actor,
+      NotificationType type,
+      Rendering rendering) {
     Notification notification =
         notificationRepository.save(
             Notification.builder()
@@ -157,7 +161,9 @@ public class NotificationServiceImpl implements NotificationService {
         notificationRepository
             .findById(notificationId)
             .orElseThrow(
-                () -> new ResourceNotFoundException("Notification " + notificationId + " not found"));
+                () ->
+                    new ResourceNotFoundException(
+                        "Notification " + notificationId + " not found"));
 
     if (!Objects.equals(notification.getReceiverId(), userId)) {
       throw new AccessDeniedException("Notification does not belong to the current user");

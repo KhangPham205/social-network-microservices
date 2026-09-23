@@ -1,41 +1,46 @@
 package com.socialnetwork.auth_service.controller;
 
+import com.socialnetwork.auth_service.config.SecurityConfig;
 import com.socialnetwork.auth_service.dto.PermissionRequest;
-import com.socialnetwork.auth_service.model.Permission;
+import com.socialnetwork.auth_service.dto.PermissionResponse;
 import com.socialnetwork.auth_service.service.PermissionService;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+/** Permission catalogue. Restricted to {@code ROLE_ADMIN} by {@link SecurityConfig}. */
 @RestController
-@RequestMapping("/api/v1/admin/permissions")
+@RequestMapping(SecurityConfig.ADMIN_PATH + "/permissions")
 @RequiredArgsConstructor
 public class PermissionController {
 
   private final PermissionService permissionService;
 
-  @PreAuthorize("hasRole('ADMIN')")
   @PostMapping
-  public ResponseEntity<Permission> create(@RequestBody PermissionRequest permission) {
-    return ResponseEntity.ok(permissionService.create(permission));
+  public ResponseEntity<PermissionResponse> create(@Valid @RequestBody PermissionRequest request) {
+    return ResponseEntity.ok(permissionService.create(request));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
   @GetMapping
-  public ResponseEntity<List<Permission>> getAll() {
+  public ResponseEntity<List<PermissionResponse>> getAll() {
     return ResponseEntity.ok(permissionService.getAll());
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
   @PutMapping("/{id}")
-  public ResponseEntity<Permission> update(
-      @PathVariable Long id, @RequestBody PermissionRequest permission) {
-    return ResponseEntity.ok(permissionService.update(id, permission));
+  public ResponseEntity<PermissionResponse> update(
+      @PathVariable Long id, @Valid @RequestBody PermissionRequest request) {
+    return ResponseEntity.ok(permissionService.update(id, request));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
   @DeleteMapping("/{id}")
   public ResponseEntity<Void> delete(@PathVariable Long id) {
     permissionService.delete(id);

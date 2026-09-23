@@ -11,7 +11,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class ReactSummaryDto {
-  private Map<String, Long> counts; // ví dụ: {"LIKE": 10, "LOVE": 3}
+  /** Reaction name to count, for example {@code {"LIKE": 10, "LOVE": 3}}. */
+  private Map<String, Long> counts;
   private long total;
-  private String currentUserReact; // ví dụ: "LOVE"
+  /** Reaction of the current viewer, or null. */
+  private String currentUserReact;
 }
