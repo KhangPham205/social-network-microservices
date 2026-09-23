@@ -1,5 +1,8 @@
 package com.socialnetwork.user_service.controller;
 
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.security.SecurityUtils;
+import com.socialnetwork.common.vo.PageVO;
 import com.socialnetwork.user_service.dto.FollowResponse;
 import com.socialnetwork.user_service.dto.UpdateProfileRequest;
 import com.socialnetwork.user_service.dto.UserProfileDto;
@@ -9,12 +12,18 @@ import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
-import com.socialnetwork.common.vo.PageVO;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping(ApiConstants.USERS)
 @RequiredArgsConstructor
 public class UserController {
 
@@ -22,13 +31,12 @@ public class UserController {
 
   @GetMapping("/me")
   public ResponseEntity<UserProfileDto> getMyProfile() {
-    Long myId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
-    return ResponseEntity.ok(userService.getProfile(myId));
+    return ResponseEntity.ok(userService.getProfile(SecurityUtils.getCurrentUserId()));
   }
 
   @GetMapping("/{userId}")
   public ResponseEntity<UserProfileDto> getUserProfile(@PathVariable("userId") Long userId) {
-    return ResponseEntity.ok(userService.getProfile(userId));
+    return ResponseEntity.ok(userService.getVisibleProfile(userId));
   }
 
   @PutMapping("/me")
@@ -53,24 +61,24 @@ public class UserController {
     return ResponseEntity.ok(userService.unfollowUser(targetId));
   }
 
-  @GetMapping("/{id}/followers")
+  @GetMapping("/{userId}/followers")
   public ResponseEntity<PageVO<UserRelationDto>> getFollowers(
-      @PathVariable(name = "id") Long id,
+      @PathVariable(name = "userId") Long userId,
       @RequestParam(name = "filter", required = false) String filter,
       @ParameterObject Pageable pageable) {
-    return ResponseEntity.ok(userService.getFollowersPaged(id, filter, pageable));
+    return ResponseEntity.ok(userService.getFollowersPaged(userId, filter, pageable));
   }
 
-  @GetMapping("/{id}/following")
+  @GetMapping("/{userId}/following")
   public ResponseEntity<PageVO<UserRelationDto>> getFollowing(
-      @PathVariable(name = "id") Long id,
+      @PathVariable(name = "userId") Long userId,
       @RequestParam(name = "filter", required = false) String filter,
       @ParameterObject Pageable pageable) {
-    return ResponseEntity.ok(userService.getFollowingPaged(id, filter, pageable));
+    return ResponseEntity.ok(userService.getFollowingPaged(userId, filter, pageable));
   }
 
-  @GetMapping("/{id}/relation-status")
-  public ResponseEntity<UserRelationDto> getRelationStatus(@PathVariable("id") Long id) {
-    return ResponseEntity.ok(userService.getRelationWithUser(id));
+  @GetMapping("/{userId}/relation-status")
+  public ResponseEntity<UserRelationDto> getRelationStatus(@PathVariable("userId") Long userId) {
+    return ResponseEntity.ok(userService.getRelationWithUser(userId));
   }
 }

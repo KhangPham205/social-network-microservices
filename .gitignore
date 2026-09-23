@@ -1,4 +1,12 @@
+# ---------------------------------------------------------------- Build output
 target/
+build/
+!**/src/main/**/target/
+!**/src/test/**/target/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# ---------------------------------------------------------------- Maven
 pom.xml.tag
 pom.xml.releaseBackup
 pom.xml.versionsBackup
@@ -7,17 +15,40 @@ release.properties
 dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
-# https://maven.apache.org/wrapper/#usage-without-binary-jar
 .mvn/wrapper/maven-wrapper.jar
 
-# Eclipse m2e generated files
-# Eclipse Core
+# ---------------------------------------------------------------- Local environment & secrets
+# Real values live here; the committed templates are docker/env.example and the ${ENV:default}
+# placeholders inside each service's application.yaml.
+.env
+*/.env
+docker/.env
+backend-microservices/docker/.env
+
+# ---------------------------------------------------------------- IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
 .project
-# JDT-specific (Eclipse Java Development Tools)
 .classpath
-backend-microservices/user-service/src/main/resources/application-dev.yaml
-backend-microservices/auth-service/src/main/resources/application-dev.yaml
-backend-microservices/auth-service/src/main/resources/application-dev.yaml
-backend-microservices/notification-service/src/main/resources/application-dev.yaml
-backend-microservices/media-service/src/main/resources/application-dev.yaml
-backend-microservices/chat-service/src/main/resources/application-dev.yaml
+.settings/
+.springBeans
+.sts4-cache
+.apt_generated
+.factorypath
+/nbproject/private/
+/nbbuild/
+/nbdist/
+/.nb-gradle/
+
+# ---------------------------------------------------------------- Python (ai-service)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---------------------------------------------------------------- Misc
+*.log
+.DS_Store

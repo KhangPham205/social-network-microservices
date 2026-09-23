@@ -26,7 +26,8 @@ public class WebSocketEventListener {
       return;
     }
     log.info("User {} connected to the notification socket", userId);
-    messagingTemplate.convertAndSend(WebSocketConstants.PUBLIC_TOPIC, PresenceEvent.online(userId));
+    messagingTemplate.convertAndSend(
+        WebSocketConstants.PUBLIC_TOPIC, PresenceEvent.online(userId));
   }
 
   @EventListener
@@ -36,7 +37,8 @@ public class WebSocketEventListener {
       return;
     }
     log.info("User {} disconnected from the notification socket", userId);
-    messagingTemplate.convertAndSend(WebSocketConstants.PUBLIC_TOPIC, PresenceEvent.offline(userId));
+    messagingTemplate.convertAndSend(
+        WebSocketConstants.PUBLIC_TOPIC, PresenceEvent.offline(userId));
   }
 
   private static Long userIdOf(Principal principal) {

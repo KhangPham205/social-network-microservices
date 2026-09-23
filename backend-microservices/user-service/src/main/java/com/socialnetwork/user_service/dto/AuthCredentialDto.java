@@ -1,6 +1,6 @@
 package com.socialnetwork.user_service.dto;
 
-import com.socialnetwork.user_service.enums.AccountStatus;
+import com.socialnetwork.common.vo.AccountStatus;
 import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

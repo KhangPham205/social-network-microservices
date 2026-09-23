@@ -10,10 +10,11 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface ReportMapper {
 
-  @Mapping(source = "reporterId", target = "reporterId")
-  @Mapping(source = "status", target = "status")
+  @Mapping(source = "bannedBySystem", target = "isBannedBySystem")
+  @Mapping(target = "reporterName", ignore = true)
+  @Mapping(target = "reporterAvatar", ignore = true)
   ReportResponse toResponse(Report report);
 
-  @Mapping(source = "userId", target = "userId")
+  @Mapping(target = "userDisplayName", ignore = true)
   ComplaintResponse toResponse(Complaint complaint);
 }

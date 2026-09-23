@@ -1,11 +1,17 @@
 package com.socialnetwork.chat_service.dto;
 
 import com.socialnetwork.chat_service.enums.ConversationRole;
-import lombok.Data;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class UpdateMemberRoleRequest {
-  private Long conversationId;
-  private Long userIdToChange;
-  private ConversationRole newRole;
+
+  @NotNull private Long conversationId;
+
+  @NotNull private Long userIdToChange;
+
+  @NotNull private ConversationRole newRole;
 }

@@ -1,236 +1,278 @@
 package com.socialnetwork.moderation_service.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
+import com.socialnetwork.common.constants.KafkaTopics;
+import com.socialnetwork.common.events.ContentCreatedEvent;
+import com.socialnetwork.common.events.MessageCreatedEvent;
+import com.socialnetwork.common.events.ModerationActionEvent;
+import com.socialnetwork.common.vo.ModerationAction;
+import com.socialnetwork.common.vo.TargetType;
 import com.socialnetwork.moderation_service.client.AiServiceClient;
+import com.socialnetwork.moderation_service.client.AuthClient;
+import com.socialnetwork.moderation_service.client.ChatClient;
+import com.socialnetwork.moderation_service.client.MediaClient;
+import com.socialnetwork.moderation_service.client.UserClient;
 import com.socialnetwork.moderation_service.dto.AiModerationRequest;
 import com.socialnetwork.moderation_service.dto.AiModerationResponse;
-import com.socialnetwork.moderation_service.event.ContentCreatedEvent;
+import com.socialnetwork.moderation_service.enums.ModerationLogAction;
+import com.socialnetwork.moderation_service.enums.ReportReason;
+import com.socialnetwork.moderation_service.enums.ReportSource;
+import com.socialnetwork.moderation_service.mapper.ReportMapper;
 import com.socialnetwork.moderation_service.model.ModerationLog;
 import com.socialnetwork.moderation_service.model.Report;
+import com.socialnetwork.moderation_service.repository.ComplaintRepository;
 import com.socialnetwork.moderation_service.repository.ModerationLogRepository;
 import com.socialnetwork.moderation_service.repository.ReportRepository;
-import com.socialnetwork.moderation_service.service.ModerationService;
+import com.socialnetwork.moderation_service.service.KafkaEventPublisher;
+import com.socialnetwork.moderation_service.service.impl.ModerationServiceImpl;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.ObjectMapper;
-import com.socialnetwork.common.vo.TargetType;
+import org.springframework.web.client.ResourceAccessException;
 
 /**
- * Unit tests for {@link ContentModerationListener}.
- *
- * <p>Strategy: isolate the listener from Kafka infrastructure entirely. We deserialise the JSON
- * payload manually (mirroring what the real KafkaListener deserialiser does) and inject it directly
- * into the method under test.
+ * Covers the AI moderation pipeline end to end at unit level: the Kafka listener hands the common
+ * event records to the real {@link ModerationServiceImpl}, everything it talks to is mocked.
  */
 @ExtendWith(MockitoExtension.class)
 class ContentModerationListenerTest {
 
-  // ── Production ObjectMapper (no Spring context needed; Jackson is available on classpath) ──
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private static final long SAVED_REPORT_ID = 500L;
 
-  @Mock private ModerationLogRepository moderationLogRepository;
-  @Mock private ReportRepository reportRepository;
-  @Mock private ModerationService moderationService;
+  @Mock private UserClient userClient;
+  @Mock private MediaClient mediaClient;
+  @Mock private ChatClient chatClient;
+  @Mock private AuthClient authClient;
   @Mock private AiServiceClient aiServiceClient;
+  @Mock private ReportRepository reportRepository;
+  @Mock private ComplaintRepository complaintRepository;
+  @Mock private ModerationLogRepository moderationLogRepository;
+  @Mock private ReportMapper reportMapper;
+  @Mock private KafkaEventPublisher eventPublisher;
 
-  @InjectMocks private ContentModerationListener listener;
+  private ContentModerationListener listener;
 
-  /**
-   * Wire the real ObjectMapper into the listener. Mockito @InjectMocks doesn't inject the
-   * already-constructed ObjectMapper above, so we set it via reflection-friendly Mockito spy
-   * constructor or simply rebuild the listener with the constructor.
-   */
   @BeforeEach
   void setUp() {
-    listener =
-        new ContentModerationListener(
-            moderationLogRepository,
+    ModerationServiceImpl moderationService =
+        new ModerationServiceImpl(
+            userClient,
+            mediaClient,
+            chatClient,
+            authClient,
+            aiServiceClient,
             reportRepository,
-            moderationService,
-            objectMapper,
-            aiServiceClient);
+            complaintRepository,
+            moderationLogRepository,
+            reportMapper,
+            eventPublisher);
+    listener = new ContentModerationListener(moderationService);
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  Helper – build a ContentCreatedEvent JSON payload
-  // ─────────────────────────────────────────────────────────────────
-  private String buildPayload(Long targetId, TargetType type, String content, Long authorId)
-      throws Exception {
-    ContentCreatedEvent event = new ContentCreatedEvent(targetId, type, content, authorId, null);
-    return objectMapper.writeValueAsString(event);
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  private void givenVerdict(boolean toxic, String reason) {
+    when(aiServiceClient.checkToxicity(any(AiModerationRequest.class)))
+        .thenReturn(new AiModerationResponse(toxic, toxic ? 0.97 : 0.02, reason));
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  Tests
-  // ─────────────────────────────────────────────────────────────────
-
-  @Test
-  @DisplayName("Given a TOXIC AI response, blockContent is called and a ModerationLog is saved")
-  void whenAiResponseIsToxic_thenBlockContentAndSaveModerationLog() throws Exception {
-    // --- Arrange ---
-    Long postId = 42L;
-    String toxicText = "This is hate speech content";
-    String payload = buildPayload(postId, TargetType.POST, toxicText, 7L);
-
-    AiModerationResponse toxicResponse = new AiModerationResponse(true, 0.97, "hate_speech");
-
-    when(aiServiceClient.checkToxicity(any(AiModerationRequest.class))).thenReturn(toxicResponse);
-
-    // Report doesn't exist yet → system creates one
-    when(reportRepository.existsByTargetIdAndTargetTypeAndIsBannedBySystemIsNotNull(
-            anyString(), any(TargetType.class)))
+  private void givenNotYetModerated() {
+    when(reportRepository.existsByTargetTypeAndTargetIdAndSource(
+            any(TargetType.class), anyString(), eq(ReportSource.SYSTEM)))
         .thenReturn(false);
+    when(reportRepository.save(any(Report.class)))
+        .thenAnswer(
+            invocation -> {
+              Report report = invocation.getArgument(0);
+              report.setId(SAVED_REPORT_ID);
+              return report;
+            });
+  }
 
-    // --- Act ---
-    listener.handleContentCreationViaKafka(payload);
+  private ModerationActionEvent capturePublishedAction() {
+    ArgumentCaptor<String> topic = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Object> event = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher, times(1))
+        .publishAfterCommit(topic.capture(), key.capture(), event.capture());
 
-    // --- Assert: AI client received the correct text ---
-    ArgumentCaptor<AiModerationRequest> requestCaptor =
+    assertThat(topic.getValue()).isEqualTo(KafkaTopics.MODERATION_ACTIONS);
+    assertThat(event.getValue()).isInstanceOf(ModerationActionEvent.class);
+    ModerationActionEvent action = (ModerationActionEvent) event.getValue();
+    assertThat(key.getValue()).isEqualTo(action.targetId());
+    return action;
+  }
+
+  // ── Content events ───────────────────────────────────────────────────────
+
+  @Test
+  @DisplayName("Toxic post: exactly one system report, one AUTO_BAN log and one BLOCK event")
+  void toxicPostIsAutoBannedOnce() {
+    givenVerdict(true, "hate_speech");
+    givenNotYetModerated();
+
+    listener.onContentCreated(
+        new ContentCreatedEvent(42L, TargetType.POST, "hateful text", 7L, null));
+
+    ArgumentCaptor<AiModerationRequest> aiRequest =
         ArgumentCaptor.forClass(AiModerationRequest.class);
-    verify(aiServiceClient, times(1)).checkToxicity(requestCaptor.capture());
-    assertThat(requestCaptor.getValue().getText()).isEqualTo(toxicText);
+    verify(aiServiceClient).checkToxicity(aiRequest.capture());
+    assertThat(aiRequest.getValue().getText()).isEqualTo("hateful text");
 
-    // --- Assert: content is blocked in moderation service ---
-    verify(moderationService, times(1)).blockContent(eq(postId.toString()), eq(TargetType.POST));
+    ArgumentCaptor<Report> report = ArgumentCaptor.forClass(Report.class);
+    verify(reportRepository, times(1)).save(report.capture());
+    assertThat(report.getValue().getSource()).isEqualTo(ReportSource.SYSTEM);
+    assertThat(report.getValue().getReporterId()).isNull();
+    assertThat(report.getValue().getReason()).isEqualTo(ReportReason.AI_DETECTED);
+    assertThat(report.getValue().getTargetType()).isEqualTo(TargetType.POST);
+    assertThat(report.getValue().getTargetId()).isEqualTo("42");
+    assertThat(report.getValue().getTargetUserId()).isEqualTo(7L);
+    assertThat(report.getValue().isBannedBySystem()).isTrue();
 
-    // --- Assert: a Report entity is persisted ---
-    ArgumentCaptor<Report> reportCaptor = ArgumentCaptor.forClass(Report.class);
-    verify(reportRepository, times(1)).save(reportCaptor.capture());
-    Report savedReport = reportCaptor.getValue();
-    assertThat(savedReport.getTargetId()).isEqualTo(postId.toString());
-    assertThat(savedReport.getTargetType()).isEqualTo(TargetType.POST);
-    assertThat(savedReport.getIsBannedBySystem()).isTrue();
+    ArgumentCaptor<ModerationLog> logEntry = ArgumentCaptor.forClass(ModerationLog.class);
+    verify(moderationLogRepository, times(1)).save(logEntry.capture());
+    assertThat(logEntry.getValue().getAction()).isEqualTo(ModerationLogAction.AUTO_BAN);
+    assertThat(logEntry.getValue().getActorId()).isNull();
+    assertThat(logEntry.getValue().getReportId()).isEqualTo(SAVED_REPORT_ID);
+    assertThat(logEntry.getValue().getReason()).contains("hate_speech");
 
-    // --- Assert: a ModerationLog entry is persisted ---
-    ArgumentCaptor<ModerationLog> logCaptor = ArgumentCaptor.forClass(ModerationLog.class);
-    verify(moderationLogRepository, times(1)).save(logCaptor.capture());
-    ModerationLog savedLog = logCaptor.getValue();
-    assertThat(savedLog.getTargetType()).isEqualTo(TargetType.POST);
-    assertThat(savedLog.getTargetId()).isEqualTo(postId.toString());
-    assertThat(savedLog.getAction()).isEqualTo("AUTO_BAN");
-    assertThat(savedLog.getReason()).contains("hate_speech");
+    ModerationActionEvent action = capturePublishedAction();
+    assertThat(action.action()).isEqualTo(ModerationAction.BLOCK);
+    assertThat(action.targetType()).isEqualTo(TargetType.POST);
+    assertThat(action.targetId()).isEqualTo("42");
   }
 
   @Test
-  @DisplayName("Given a CLEAN AI response, blockContent is NOT called and nothing is persisted")
-  void whenAiResponseIsClean_thenNoBlockAndNoPersistence() throws Exception {
-    // --- Arrange ---
-    Long postId = 99L;
-    String payload = buildPayload(postId, TargetType.POST, "A wholesome family post", 3L);
+  @DisplayName("Toxic comment: the COMMENT target type survives the whole pipeline")
+  void toxicCommentKeepsItsTargetType() {
+    givenVerdict(true, "abusive_language");
+    givenNotYetModerated();
 
-    AiModerationResponse cleanResponse = new AiModerationResponse(false, 0.05, null);
-    when(aiServiceClient.checkToxicity(any(AiModerationRequest.class))).thenReturn(cleanResponse);
+    listener.onContentCreated(
+        new ContentCreatedEvent(7L, TargetType.COMMENT, "abuse", 5L, null));
 
-    // --- Act ---
-    listener.handleContentCreationViaKafka(payload);
+    ArgumentCaptor<Report> report = ArgumentCaptor.forClass(Report.class);
+    verify(reportRepository).save(report.capture());
+    assertThat(report.getValue().getTargetType()).isEqualTo(TargetType.COMMENT);
+    assertThat(capturePublishedAction().targetType()).isEqualTo(TargetType.COMMENT);
+  }
 
-    // --- Assert ---
-    verify(moderationService, never()).blockContent(any(), any());
+  @Test
+  @DisplayName("Media attached to the event is forwarded to the model")
+  void mediaIsForwardedToTheModel() {
+    givenVerdict(true, "nsfw_image");
+    givenNotYetModerated();
+
+    listener.onContentCreated(
+        new ContentCreatedEvent(
+            12L,
+            TargetType.POST,
+            "post with image",
+            2L,
+            List.of(Map.of("url", "http://img.test/1.jpg", "type", "IMAGE"))));
+
+    ArgumentCaptor<AiModerationRequest> aiRequest =
+        ArgumentCaptor.forClass(AiModerationRequest.class);
+    verify(aiServiceClient).checkToxicity(aiRequest.capture());
+    assertThat(aiRequest.getValue().getMedia())
+        .isNotNull()
+        .first()
+        .satisfies(entry -> assertThat(entry).containsEntry("url", "http://img.test/1.jpg"));
+  }
+
+  @Test
+  @DisplayName("Clean content: nothing is written and nothing is published")
+  void cleanContentIsLeftAlone() {
+    givenVerdict(false, null);
+
+    listener.onContentCreated(
+        new ContentCreatedEvent(99L, TargetType.POST, "a wholesome family post", 3L, null));
+
     verify(reportRepository, never()).save(any());
     verify(moderationLogRepository, never()).save(any());
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
-  @DisplayName(
-      "Given a COMMENT type TOXIC event, TargetType.COMMENT is used throughout the pipeline")
-  void whenToxicComment_thenCommentTypeIsPreservedInPersistence() throws Exception {
-    // --- Arrange ---
-    Long commentId = 7L;
-    String payload = buildPayload(commentId, TargetType.COMMENT, "Abusive comment text", 5L);
-
-    AiModerationResponse toxicResponse = new AiModerationResponse(true, 0.89, "abusive_language");
-
-    when(aiServiceClient.checkToxicity(any())).thenReturn(toxicResponse);
-    when(reportRepository.existsByTargetIdAndTargetTypeAndIsBannedBySystemIsNotNull(
-            anyString(), any()))
-        .thenReturn(false);
-
-    // --- Act ---
-    listener.handleContentCreationViaKafka(payload);
-
-    // --- Assert ---
-    verify(moderationService).blockContent(eq(commentId.toString()), eq(TargetType.COMMENT));
-
-    ArgumentCaptor<Report> reportCaptor = ArgumentCaptor.forClass(Report.class);
-    verify(reportRepository).save(reportCaptor.capture());
-    assertThat(reportCaptor.getValue().getTargetType()).isEqualTo(TargetType.COMMENT);
-  }
-
-  @Test
-  @DisplayName("Given a duplicate TOXIC event, the second Report is NOT saved (idempotency guard)")
-  void whenToxicContentAlreadyBanned_thenReportIsNotDuplicated() throws Exception {
-    // --- Arrange ---
-    Long postId = 55L;
-    String payload = buildPayload(postId, TargetType.POST, "Already banned content", 9L);
-
-    AiModerationResponse toxicResponse = new AiModerationResponse(true, 0.95, "spam");
-
-    when(aiServiceClient.checkToxicity(any())).thenReturn(toxicResponse);
-    // Simulate: a report already exists
-    when(reportRepository.existsByTargetIdAndTargetTypeAndIsBannedBySystemIsNotNull(
-            anyString(), any()))
+  @DisplayName("Already auto-moderated target: the redelivered event writes nothing twice")
+  void redeliveredEventIsIdempotent() {
+    givenVerdict(true, "spam");
+    when(reportRepository.existsByTargetTypeAndTargetIdAndSource(
+            TargetType.POST, "55", ReportSource.SYSTEM))
         .thenReturn(true);
 
-    // --- Act ---
-    listener.handleContentCreationViaKafka(payload);
+    listener.onContentCreated(
+        new ContentCreatedEvent(55L, TargetType.POST, "already banned", 9L, null));
 
-    // --- Assert: blockContent still fires (Kafka command resent), but NO new Report row ---
-    verify(moderationService, times(1)).blockContent(any(), any());
     verify(reportRepository, never()).save(any());
+    verify(moderationLogRepository, never()).save(any());
+    verifyNoInteractions(eventPublisher);
   }
 
   @Test
-  @DisplayName("Given a malformed JSON payload, no exception propagates and nothing is called")
-  void whenMalformedPayload_thenExceptionIsSuppressedGracefully() {
-    // --- Arrange ---
-    String badPayload = "{ INVALID JSON !!";
+  @DisplayName("A failing AI scan propagates so Kafka retries and finally dead-letters the record")
+  void aiFailurePropagates() {
+    when(aiServiceClient.checkToxicity(any(AiModerationRequest.class)))
+        .thenThrow(new ResourceAccessException("ai-service timed out"));
 
-    // --- Act – must not throw ---
-    listener.handleContentCreationViaKafka(badPayload);
-
-    // --- Assert ---
-    verify(aiServiceClient, never()).checkToxicity(any());
-    verify(moderationService, never()).blockContent(any(), any());
-  }
-
-  @Test
-  @DisplayName("Given TOXIC event for a COMMENT with media, media list is forwarded to AI client")
-  void whenToxicEventHasMedia_thenAiRequestIncludesMedia() throws Exception {
-    // --- Arrange ---
-    Long postId = 12L;
     ContentCreatedEvent event =
-        new ContentCreatedEvent(
-            postId,
-            TargetType.POST,
-            "Post with image",
-            2L,
-            List.of(java.util.Map.of("url", "http://img.test/1.jpg", "type", "IMAGE")));
-    String payload = objectMapper.writeValueAsString(event);
+        new ContentCreatedEvent(1L, TargetType.POST, "unscanned text", 4L, null);
 
-    AiModerationResponse toxicResponse = new AiModerationResponse(true, 0.91, "nsfw_image");
+    assertThatThrownBy(() -> listener.onContentCreated(event))
+        .isInstanceOf(ResourceAccessException.class);
 
-    when(aiServiceClient.checkToxicity(any())).thenReturn(toxicResponse);
-    when(reportRepository.existsByTargetIdAndTargetTypeAndIsBannedBySystemIsNotNull(
-            anyString(), any()))
-        .thenReturn(false);
+    verify(reportRepository, never()).save(any());
+    verify(moderationLogRepository, never()).save(any());
+    verifyNoInteractions(eventPublisher);
+  }
 
-    // --- Act ---
-    listener.handleContentCreationViaKafka(payload);
+  // ── Message events ───────────────────────────────────────────────────────
 
-    // --- Assert: AI request included the media list ---
-    ArgumentCaptor<AiModerationRequest> captor = ArgumentCaptor.forClass(AiModerationRequest.class);
-    verify(aiServiceClient).checkToxicity(captor.capture());
-    assertThat(captor.getValue().getMedia()).isNotNull().isNotEmpty();
-    assertThat(captor.getValue().getMedia().get(0)).containsEntry("url", "http://img.test/1.jpg");
+  @Test
+  @DisplayName("Toxic chat message: auto-banned under its Mongo id as a MESSAGE target")
+  void toxicMessageIsAutoBanned() {
+    givenVerdict(true, "harassment");
+    givenNotYetModerated();
+
+    listener.onMessageCreated(
+        new MessageCreatedEvent("65f1c0ffee0000000000dead", 3L, 11L, "go away"));
+
+    ArgumentCaptor<Report> report = ArgumentCaptor.forClass(Report.class);
+    verify(reportRepository).save(report.capture());
+    assertThat(report.getValue().getTargetType()).isEqualTo(TargetType.MESSAGE);
+    assertThat(report.getValue().getTargetId()).isEqualTo("65f1c0ffee0000000000dead");
+    assertThat(report.getValue().getTargetUserId()).isEqualTo(11L);
+
+    ModerationActionEvent action = capturePublishedAction();
+    assertThat(action.action()).isEqualTo(ModerationAction.BLOCK);
+    assertThat(action.targetId()).isEqualTo("65f1c0ffee0000000000dead");
+  }
+
+  @Test
+  @DisplayName("Clean chat message: nothing happens")
+  void cleanMessageIsLeftAlone() {
+    givenVerdict(false, null);
+
+    listener.onMessageCreated(new MessageCreatedEvent("65f1c0ffee0000000000beef", 3L, 11L, "hi"));
+
+    verify(reportRepository, never()).save(any());
+    verify(moderationLogRepository, never()).save(any());
+    verifyNoInteractions(eventPublisher);
   }
 }

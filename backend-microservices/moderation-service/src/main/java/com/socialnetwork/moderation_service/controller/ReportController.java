@@ -1,49 +1,59 @@
 package com.socialnetwork.moderation_service.controller;
 
-import com.socialnetwork.moderation_service.dto.*;
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.security.SecurityUtils;
+import com.socialnetwork.common.vo.PageVO;
+import com.socialnetwork.moderation_service.dto.CreateReportRequest;
+import com.socialnetwork.moderation_service.dto.ReportResponse;
+import com.socialnetwork.moderation_service.dto.UpdateReportRequest;
 import com.socialnetwork.moderation_service.service.ReportService;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
-import com.socialnetwork.common.vo.PageVO;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/moderation/reports")
+@RequestMapping(ApiConstants.MODERATION + "/reports")
 @RequiredArgsConstructor
 public class ReportController {
 
   private final ReportService reportService;
 
-  // 1. User tạo report
+  /** Filing a report is open to every signed-in user. */
   @PostMapping
-  @PreAuthorize("hasAuthority('REPORT:CREATE')")
-  public ResponseEntity<ReportResponse> createReport(@RequestBody CreateReportRequest request) {
-    Long currentUserId =
-        Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
-    return ResponseEntity.ok(reportService.createReport(currentUserId, request));
+  @PreAuthorize("isAuthenticated()")
+  public ResponseEntity<ReportResponse> createReport(
+      @Valid @RequestBody CreateReportRequest request) {
+    return ResponseEntity.ok(
+        reportService.createReport(SecurityUtils.getCurrentUserId(), request));
   }
 
   @PutMapping
-  @PreAuthorize("hasAuthority('REPORT:PROCESS')")
+  @PreAuthorize("hasRole('ADMIN') or hasAuthority('REPORT:PROCESS')")
   public ResponseEntity<List<ReportResponse>> updateReport(
-      @RequestBody UpdateReportRequest request) {
+      @Valid @RequestBody UpdateReportRequest request) {
     return ResponseEntity.ok(reportService.updateReport(request));
   }
 
   @GetMapping("/{reportId}")
-  @PreAuthorize("hasAuthority('REPORT:VIEW_ALL')")
+  @PreAuthorize("hasRole('ADMIN') or hasAuthority('REPORT:VIEW_ALL')")
   public ResponseEntity<ReportResponse> getReportById(@PathVariable("reportId") Long reportId) {
     return ResponseEntity.ok(reportService.getReportById(reportId));
   }
 
-  // 2. Admin xem danh sách report (có filter)
   @GetMapping
-  @PreAuthorize("hasAuthority('REPORT:VIEW_ALL')")
+  @PreAuthorize("hasRole('ADMIN') or hasAuthority('REPORT:VIEW_ALL')")
   public ResponseEntity<PageVO<ReportResponse>> getReports(
       @RequestParam(required = false) String filter, @ParameterObject Pageable pageable) {
     return ResponseEntity.ok(reportService.getReports(filter, pageable));

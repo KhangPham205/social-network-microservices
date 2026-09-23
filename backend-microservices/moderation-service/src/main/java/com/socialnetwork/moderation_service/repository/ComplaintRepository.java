@@ -1,7 +1,9 @@
 package com.socialnetwork.moderation_service.repository;
 
-import com.socialnetwork.moderation_service.model.Complaint;
 import com.socialnetwork.common.dto.IdCount;
+import com.socialnetwork.common.vo.TargetType;
+import com.socialnetwork.moderation_service.enums.ComplaintStatus;
+import com.socialnetwork.moderation_service.model.Complaint;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,13 +12,16 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import com.socialnetwork.common.vo.TargetType;
 
 @Repository
 public interface ComplaintRepository
     extends JpaRepository<Complaint, Long>, JpaSpecificationExecutor<Complaint> {
-  // Check if complaint already exists for this content (prevent spam)
-  boolean existsByTargetTypeAndTargetId(TargetType targetType, String targetId);
+
+  /**
+   * A user may only have one open complaint per target; once it is decided they may file again.
+   */
+  boolean existsByUserIdAndTargetTypeAndTargetIdAndStatus(
+      Long userId, TargetType targetType, String targetId, ComplaintStatus status);
 
   Page<Complaint> findByTargetTypeAndTargetId(
       TargetType targetType, String targetId, Pageable pageable);

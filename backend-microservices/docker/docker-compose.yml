@@ -1,187 +1,155 @@
+# Development infrastructure: databases, broker, object storage and the AI sidecar.
+# The Java services are NOT started here; run them from the IDE/Maven, or add the companion file:
+#
+#   docker compose up -d                                            # infrastructure only
+#   docker compose -f docker-compose.yml -f docker-compose.services.yml up --build   # everything
+#
+# Credentials come from docker/.env (copy docker/env.example first).
+
+name: social-network
+
+x-postgres-healthcheck: &postgres-healthcheck
+  test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+  interval: 10s
+  timeout: 5s
+  retries: 10
+
 services:
-  # 1. Database ĐỘC LẬP cho Auth Service (Port 5432)
+  # ─────────────────────────────────────────────── One PostgreSQL per service (database-per-service)
   postgres-auth:
     image: postgres:15-alpine
-    container_name: postgres_auth
-    restart: always
-    ports:
-      - "5432:5432"
+    container_name: postgres-auth
+    restart: unless-stopped
+    ports: ["5432:5432"]
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: auth_db
-    volumes:
-      - auth_db_data:/var/lib/postgresql/data
-    networks:
-      - social-network-net
+    volumes: [auth_db_data:/var/lib/postgresql/data]
+    healthcheck: *postgres-healthcheck
+    networks: [social-network-net]
 
-  # 2. Database ĐỘC LẬP cho User Service (Port 5433)
   postgres-user:
     image: postgres:15-alpine
-    container_name: postgres_user
-    restart: always
-    ports:
-      - "5433:5432"
+    container_name: postgres-user
+    restart: unless-stopped
+    ports: ["5433:5432"]
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: user_db
-    volumes:
-      - user_db_data:/var/lib/postgresql/data
-    networks:
-      - social-network-net
+    volumes: [user_db_data:/var/lib/postgresql/data]
+    healthcheck: *postgres-healthcheck
+    networks: [social-network-net]
 
-  # 3. Database ĐỘC LẬP cho Media Service (Port 5434)
   postgres-media:
     image: postgres:15-alpine
-    container_name: postgres_media
-    restart: always
-    ports:
-      - "5434:5432"
+    container_name: postgres-media
+    restart: unless-stopped
+    ports: ["5434:5432"]
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: media_db
-    volumes:
-      - media_db_data:/var/lib/postgresql/data
-    networks:
-      - social-network-net
+    volumes: [media_db_data:/var/lib/postgresql/data]
+    healthcheck: *postgres-healthcheck
+    networks: [social-network-net]
 
-  # 4. Database ĐỘC LẬP cho Notification Service (Port 5435)
   postgres-noti:
     image: postgres:15-alpine
-    container_name: postgres_noti
-    restart: always
-    ports:
-      - "5435:5432"
+    container_name: postgres-noti
+    restart: unless-stopped
+    ports: ["5435:5432"]
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: notification_db
-    volumes:
-      - noti_db_data:/var/lib/postgresql/data
-    networks:
-      - social-network-net
+    volumes: [noti_db_data:/var/lib/postgresql/data]
+    healthcheck: *postgres-healthcheck
+    networks: [social-network-net]
 
-  # 5. Database ĐỘC LẬP cho Chat Service (Port 5436) - QUẢN LÝ PHÒNG CHAT
   postgres-chat:
     image: postgres:15-alpine
-    container_name: postgres_chat
-    restart: always
-    ports:
-      - "5436:5432" # Ánh xạ ra cổng 5436
+    container_name: postgres-chat
+    restart: unless-stopped
+    ports: ["5436:5432"]
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: chat_db
-    volumes:
-      - chat_db_data:/var/lib/postgresql/data
-    networks:
-      - social-network-net
+    volumes: [chat_db_data:/var/lib/postgresql/data]
+    healthcheck: *postgres-healthcheck
+    networks: [social-network-net]
 
-  # 6. Database ĐỘC LẬP cho Moderation Service (Port 5437)
   postgres-moderation:
     image: postgres:15-alpine
-    container_name: postgres_moderation
-    restart: always
-    ports:
-      - "5437:5432" # Khớp với port trong application.yml
+    container_name: postgres-moderation
+    restart: unless-stopped
+    ports: ["5437:5432"]
     environment:
-      POSTGRES_USER: postgres  # Khớp với username trong application.yml
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: moderation_db
-    volumes:
-      - moderation_db_data:/var/lib/postgresql/data
-    networks:
-      - social-network-net
+    volumes: [moderation_db_data:/var/lib/postgresql/data]
+    healthcheck: *postgres-healthcheck
+    networks: [social-network-net]
 
-  # 7. MongoDB cho Chat Service - LƯU TRỮ TIN NHẮN
+  # ─────────────────────────────────────────────── MongoDB: chat message history
   mongodb:
-    image: mongo:latest
-    container_name: social_network_mongodb
-    restart: always
-    ports:
-      - "27017:27017"
+    image: mongo:7.0
+    container_name: mongodb
+    restart: unless-stopped
+    ports: ["27017:27017"]
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-    volumes:
-      - mongo_data:/data/db
-    networks:
-      - social-network-net
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes: [mongo_data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [social-network-net]
 
-  # 8. Mongo Express - GIAO DIỆN QUẢN LÝ MONGODB (Port 8081)
-  mongo-express:
-    image: mongo-express
-    container_name: social_network_mongo_express
-    ports:
-      - "8090:8081"
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: password
-      ME_CONFIG_MONGODB_URL: mongodb://admin:password@mongodb:27017/
-
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: password
-    depends_on:
-      - mongodb
-    networks:
-      - social-network-net
-
-  # 9. Redis để Caching (Newsfeed, Like count)
+  # ─────────────────────────────────────────────── Redis: cache (media, chat)
   redis:
     image: redis:7.2-alpine
-    container_name: social_network_redis
-    restart: always
-    ports:
-      - "6379:6379"
-    networks:
-      - social-network-net
+    container_name: redis
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [social-network-net]
 
-  # 10. Minio để lưu trữ file (Ảnh/Video của Post)
+  # ─────────────────────────────────────────────── MinIO: post media + Milvus backing store
   minio:
-    image: minio/minio:latest
-    container_name: social_network_minio
-    restart: always
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: minio
+    restart: unless-stopped
+    ports: ["9000:9000", "9001:9001"]
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - social-network-net
+    volumes: [minio_data:/data]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [social-network-net]
 
-  # 11. pgAdmin (Quản lý chung các DB Postgres)
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: social_network_pgadmin
-    restart: always
-    ports:
-      - "5050:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@social.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    depends_on:
-      - postgres-auth
-      - postgres-user
-      - postgres-media
-      - postgres-noti
-      - postgres-chat
-      - postgres-moderation
-    networks:
-      - social-network-net
-
-  # 12. Kafka
+  # ─────────────────────────────────────────────── Kafka (KRaft, single node)
+  # EXTERNAL listener for processes on the host, INTERNAL for other containers.
   kafka:
     image: apache/kafka:3.7.0
-    container_name: social_network_kafka
-    restart: always
-    ports:
-      - "9092:9092"
+    container_name: kafka
+    restart: unless-stopped
+    ports: ["9092:9092"]
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -195,97 +163,147 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-    networks:
-      - social-network-net
+    volumes: [kafka_data:/var/lib/kafka/data]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9094 >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks: [social-network-net]
 
-  # 13. Kafka UI
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: social_network_kafka_ui
-    restart: always
-    ports:
-      - "8888:8080"
-    environment:
-      - KAFKA_CLUSTERS_0_NAME=local-kraft
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9094
-    depends_on:
-      - kafka
-    networks:
-      - social-network-net
-  ai-service:
-    build: ../ai-service
-    container_name: ai-service
-    ports:
-      - "8000:5000"
-    networks:
-      - social-network-net
-
-  # 14. Neo4j cho Friend Recommendation
+  # ─────────────────────────────────────────────── Neo4j: social graph (user + media)
   neo4j:
-    image: neo4j:latest
-    container_name: neo4j-social
-    ports:
-      - "7474:7474" # HTTP UI
-      - "7687:7687" # Bolt Protocol
+    image: neo4j:5.26
+    container_name: neo4j
+    restart: unless-stopped
+    ports: ["7474:7474", "7687:7687"]
     environment:
-      - NEO4J_AUTH=neo4j/password
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
-    networks:
-      - social-network-net
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u ${NEO4J_USER} -p ${NEO4J_PASSWORD} 'RETURN 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks: [social-network-net]
 
-  # 15. Etcd (Dependencies for Milvus)
+  # ─────────────────────────────────────────────── Milvus: vector search for the explore feed
   etcd:
-    container_name: milvus-etcd
     image: quay.io/coreos/etcd:v3.5.5
+    container_name: milvus-etcd
+    restart: unless-stopped
     environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
-      - ETCD_QUOTA_BACKEND_BYTES=4294967296
-      - ETCD_SNAPSHOT_COUNT=50000
-    volumes:
-      - milvus_etcd_data:/etcd
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
     command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
-    networks:
-      - social-network-net
+    volumes: [milvus_etcd_data:/etcd]
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks: [social-network-net]
 
-  # 16. Milvus Standalone (Vector DB)
   milvus-standalone:
-    container_name: milvus-standalone
     image: milvusdb/milvus:v2.5.3
+    container_name: milvus-standalone
+    restart: unless-stopped
     command: ["milvus", "run", "standalone"]
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
-      MINIO_ACCESS_KEY_ID: admin
-      MINIO_SECRET_ACCESS_KEY: password123
+      MINIO_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      MINIO_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET_NAME: milvus-bucket
-    volumes:
-      - milvus_data:/var/lib/milvus
-    ports:
-      - "19530:19530"
-      - "9091:9091"
+    ports: ["19530:19530", "9091:9091"]
+    volumes: [milvus_data:/var/lib/milvus]
     depends_on:
-      - etcd
-      - minio
-    networks:
-      - social-network-net
+      etcd: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks: [social-network-net]
 
-  # 17. Attu (Giao diện quản lý Milvus)
+  # ─────────────────────────────────────────────── AI sidecar (embeddings + moderation)
+  ai-service:
+    build: ../ai-service
+    container_name: ai-service
+    restart: unless-stopped
+    ports: ["8000:5000"]
+    environment:
+      MINIO_INTERNAL_URL: http://minio:9000
+      LOG_LEVEL: INFO
+    volumes:
+      - huggingface_cache:/home/app/.cache/huggingface
+    depends_on:
+      minio: {condition: service_healthy}
+    mem_limit: 4g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5000/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+    networks: [social-network-net]
+
+  # ─────────────────────────────────────────────── Admin UIs (development convenience only)
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: mongo-express
+    restart: unless-stopped
+    ports: ["8090:8081"]
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_PASSWORD}
+    depends_on:
+      mongodb: {condition: service_healthy}
+    networks: [social-network-net]
+
+  pgadmin:
+    image: dpage/pgadmin4:8.14
+    container_name: pgadmin
+    restart: unless-stopped
+    ports: ["5050:80"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes: [pgadmin_data:/var/lib/pgadmin]
+    networks: [social-network-net]
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    restart: unless-stopped
+    ports: ["8888:8080"]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-kraft
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9094
+    depends_on:
+      kafka: {condition: service_healthy}
+    networks: [social-network-net]
+
   attu:
+    image: zilliz/attu:v2.5.0
     container_name: attu
-    image: zilliz/attu:latest
+    restart: unless-stopped
+    ports: ["8001:3000"]
     environment:
       MILVUS_URL: milvus-standalone:19530
-    ports:
-      - "8001:3000"
-    depends_on:
-      - milvus-standalone
-    networks:
-      - social-network-net
+    depends_on: [milvus-standalone]
+    networks: [social-network-net]
 
-# Đã bổ sung đầy đủ ổ cứng ảo
 volumes:
   auth_db_data:
   user_db_data:
@@ -294,11 +312,15 @@ volumes:
   chat_db_data:
   moderation_db_data:
   mongo_data:
+  redis_data:
   minio_data:
+  kafka_data:
   neo4j_data:
   neo4j_logs:
   milvus_data:
   milvus_etcd_data:
+  pgadmin_data:
+  huggingface_cache:
 
 networks:
   social-network-net:

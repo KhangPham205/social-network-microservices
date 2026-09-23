@@ -1,42 +1,65 @@
 server:
-  port: 8086
+  port: ${SERVER_PORT:8086}
+  forward-headers-strategy: framework
 
 spring:
   application:
     name: moderation-service
-  profiles:
-    active: dev
+
   datasource:
-    url: jdbc:postgresql://localhost:5437/moderation_db
-    username: postgres
-    password: password
+    url: ${DB_URL:jdbc:postgresql://localhost:5437/moderation_db}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
     consumer:
-      group-id: moderation-service-group
+      group-id: moderation-service
       auto-offset-reset: earliest
-  swagger-ui:
-    path: /swagger-ui.html
-    server:
-      url: http://localhost:8080
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.trusted.packages: com.socialnetwork.common.events
+        spring.json.use.type.headers: true
+    listener:
+      ack-mode: record
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${server.port}
 
+ai-service:
+  url: ${AI_SERVICE_URL:http://localhost:8000}
+
 jwt:
-  secret: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
-  expiration: 86400000 # Thời gian sống của Token (vd: 1 ngày = 86400000 ms)
-  refresh:
-    expiration: 604800000 # Thời gian sống của Refresh Token (vd: 7 ngày = 604800000 ms)
+  secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-0123456789abcdef}
+
+app:
+  internal:
+    token: ${INTERNAL_API_TOKEN:dev-only-internal-token-change-me}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

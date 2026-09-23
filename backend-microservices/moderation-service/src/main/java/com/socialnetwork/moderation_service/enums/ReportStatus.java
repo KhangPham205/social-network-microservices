@@ -1,7 +1,10 @@
 package com.socialnetwork.moderation_service.enums;
 
+/** Lifecycle of a report. */
 public enum ReportStatus {
-  PENDING, // Đang chờ xử lý (Mod chưa xem)
-  APPROVED, // Đã duyệt (Mod xác nhận vi phạm)
-  REJECTED, // Đã từ chối (Mod thấy không vi phạm)
+  PENDING,
+  /** A moderator confirmed the violation. */
+  APPROVED,
+  /** A moderator found no violation. */
+  REJECTED
 }

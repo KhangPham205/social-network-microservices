@@ -1,11 +1,11 @@
 package com.socialnetwork.user_service.dto;
 
+import com.socialnetwork.common.vo.FriendshipStatus;
 import com.socialnetwork.user_service.model.Friendship;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import com.socialnetwork.common.vo.FriendshipStatus;
 
 @Data
 @NoArgsConstructor
@@ -17,11 +17,21 @@ public class FriendshipResponse {
   private Long senderId;
   private Long receiverId;
 
-  public static FriendshipResponse from(Friendship f, Long viewerId) {
+  /** Keeps the real direction of the row: sender is whoever created it, whoever is looking. */
+  public static FriendshipResponse from(Friendship friendship) {
     return FriendshipResponse.builder()
-        .status(f.getStatus())
-        .senderId(f.getSender().getId().equals(viewerId) ? viewerId : f.getReceiver().getId())
-        .receiverId(f.getSender().getId().equals(viewerId) ? f.getReceiver().getId() : viewerId)
+        .status(friendship.getStatus())
+        .senderId(friendship.getSender().getId())
+        .receiverId(friendship.getReceiver().getId())
+        .build();
+  }
+
+  /** Placeholder returned when the two users have no row at all. */
+  public static FriendshipResponse none(Long viewerId, Long targetId) {
+    return FriendshipResponse.builder()
+        .status(FriendshipStatus.NONE)
+        .senderId(viewerId)
+        .receiverId(targetId)
         .build();
   }
 }

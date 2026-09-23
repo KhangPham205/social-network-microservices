@@ -11,5 +11,6 @@ public class ReactUserDto {
   private String displayName;
   private String avatarUrl;
   private Long reactTypeId;
-  private String reactTypeName; // ví dụ: LIKE, LOVE, HAHA
+  /** LIKE, LOVE, HAHA, ... */
+  private String reactTypeName;
 }

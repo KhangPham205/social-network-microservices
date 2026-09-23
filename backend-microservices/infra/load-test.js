@@ -8,9 +8,9 @@
  *   Stage 2 – Sustain   : 500 VUs for         1 m
  *   Stage 3 – Ramp-down : 500 → 0 VUs over   30 s
  *
- * Scenarios:
- *   A – Read Heavy  : GET /api/v1/recommendations/explore   (feed fetching)
- *   B – Write Heavy : POST /api/v1/media/posts              (post creation → Kafka + AI)
+ * Scenarios (each VU iteration picks one: ~70 % read, ~30 % write):
+ *   A – Read Heavy  : GET  /api/v1/media/posts/me      (paged list of the caller's posts)
+ *   B – Write Heavy : POST /api/v1/media/posts/create  (multipart upload -> MinIO + Kafka + AI)
  *
  * Thresholds:
  *   • p(95) of all requests < 500 ms
@@ -30,7 +30,6 @@
 import http from "k6/http";
 import { check, sleep, group } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
-import { FormData } from 'https://jslib.k6.io/formdata/0.0.2/index.js';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Configuration
@@ -251,10 +250,29 @@ export function setup() {
   }
 }
 
-export function teardown(data) {
+export function teardown() {
   console.log("=================================================");
-  console.log("  Load test complete.");
-  console.log(`  Scenario A errors : ${scenarioAErrors.value || 0}`);
-  console.log(`  Scenario B errors : ${scenarioBErrors.value || 0}`);
+  console.log("  Load test complete - see the summary below.");
   console.log("=================================================");
+}
+
+/**
+ * Custom end-of-test summary. Metric values are only available here: a Counter object has no
+ * readable `.value` inside setup/teardown, which is why the previous version always printed 0.
+ */
+export function handleSummary(data) {
+  const count = (name) => data.metrics[name]?.values?.count ?? 0;
+  const p95 = (name) => Math.round(data.metrics[name]?.values?.["p(95)"] ?? 0);
+  const lines = [
+    "=================================================",
+    "  Social Network - k6 results",
+    `  Requests          : ${count("http_reqs")}`,
+    `  Error rate        : ${((data.metrics.error_rate?.values?.rate ?? 0) * 100).toFixed(2)} %`,
+    `  Scenario A errors : ${count("scenario_a_errors")}  (p95 ${p95("scenario_a_duration")} ms)`,
+    `  Scenario B errors : ${count("scenario_b_errors")}  (p95 ${p95("scenario_b_duration")} ms)`,
+    `  Overall p95       : ${p95("http_req_duration")} ms`,
+    "=================================================",
+    "",
+  ];
+  return { stdout: lines.join("\n") };
 }

@@ -1,9 +1,18 @@
 package com.socialnetwork.chat_service.dto;
 
-import lombok.Data;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class MarkReadRequest {
-  private Long conversationId;
+
+  @NotNull private Long conversationId;
+
+  @NotBlank
+  @Size(max = 64)
   private String messageId;
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.socialnetwork.api_gateway.config.CorsConfig;
 import com.socialnetwork.api_gateway.filter.InternalPathBlockingFilter;
 import com.socialnetwork.api_gateway.routes.GatewayRoutesConfig;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -207,8 +208,11 @@ class GatewayRoutingTest {
         "/api/v1/users/profile/../internal/1"
       })
   void internalPaths_areBlockedWith404(String path) {
+    // Build the absolute URI by hand: uri(String) would re-encode '%' into '%25' and turn
+    // "%69nternal" into a genuinely different path, so the escape sequence must survive verbatim.
+    URI uri = URI.create("http://localhost:" + port + path);
     for (var method : List.of(webTestClient.get(), webTestClient.post(), webTestClient.put())) {
-      method.uri(path).exchange().expectStatus().isNotFound();
+      method.uri(uri).exchange().expectStatus().isNotFound();
     }
   }
 

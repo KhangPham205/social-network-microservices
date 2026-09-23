@@ -1,5 +1,6 @@
 package com.socialnetwork.user_service.client;
 
+import com.socialnetwork.common.constants.ApiConstants;
 import com.socialnetwork.user_service.dto.AuthCredentialDto;
 import com.socialnetwork.user_service.dto.UpdateRoleStatusRequest;
 import java.util.List;
@@ -9,7 +10,8 @@ import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 import org.springframework.web.service.annotation.PutExchange;
 
-@HttpExchange("/api/v1/auth/internal")
+/** auth-service internal API, protected by the shared internal token. */
+@HttpExchange(ApiConstants.AUTH + ApiConstants.INTERNAL)
 public interface AuthClient {
 
   @PostExchange("/credentials/batch")

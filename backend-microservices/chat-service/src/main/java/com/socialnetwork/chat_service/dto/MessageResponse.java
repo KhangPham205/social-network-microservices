@@ -1,30 +1,37 @@
-// MessageResponse.java (đã tương thích với jsonb map)
 package com.socialnetwork.chat_service.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.socialnetwork.chat_service.enums.MessageType;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-@Data
+/** Wire representation of a message, used by REST responses and WebSocket broadcasts alike. */
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class MessageResponse {
+
   private String id;
   private Long conversationId;
   private Long senderId;
   private String senderName;
   private String senderAvatar;
-  private Long replyToId;
+  private String replyToId;
   private String content;
-  private List<Map<String, Object>> media; // media as list of maps { url, type, ... }
+  private MessageType type;
+  private List<MediaItem> media;
 
   @JsonFormat(shape = JsonFormat.Shape.STRING)
   private Instant createdAt;
 
-  private Boolean isRead;
-  private List<Map<String, Object>> reactions; // list of reaction objects
+  private List<Long> readBy;
+  private boolean deleted;
   private Instant deletedAt;
 }

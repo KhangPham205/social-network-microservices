@@ -1,5 +1,5 @@
 server:
-  port: 8761 # Port mặc định của Eureka
+  port: ${SERVER_PORT:8761}
 
 spring:
   application:
@@ -7,7 +7,18 @@ spring:
 
 eureka:
   instance:
-    hostname: localhost
+    hostname: ${EUREKA_HOSTNAME:localhost}
   client:
-    register-with-eureka: false # Bản thân nó là server, không cần đăng ký
+    # The registry is the server itself: it neither registers nor fetches.
+    register-with-eureka: false
     fetch-registry: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    root: INFO

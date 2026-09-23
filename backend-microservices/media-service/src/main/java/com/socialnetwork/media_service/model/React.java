@@ -21,7 +21,7 @@ public class React {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  // Dùng UserCache thay vì User
+  /** Read model of the reacting user. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)
   private UserCache user;

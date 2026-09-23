@@ -23,7 +23,7 @@ public class PostResponse {
   private String authorAvatar;
   private Long authorId;
 
-  // Nếu bài gốc không khả dụng => null
+  // Null when the shared post is no longer available.
   private Long sharedPostId;
   private PostResponse sharedPost;
 

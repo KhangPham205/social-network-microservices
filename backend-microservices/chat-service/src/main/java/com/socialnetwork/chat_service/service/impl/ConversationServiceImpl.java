@@ -1,10 +1,19 @@
 package com.socialnetwork.chat_service.service.impl;
 
-import com.socialnetwork.chat_service.client.UserClient;
-import com.socialnetwork.chat_service.dto.*;
+import com.socialnetwork.chat_service.dto.AddMembersRequest;
+import com.socialnetwork.chat_service.dto.ConversationCreateRequest;
+import com.socialnetwork.chat_service.dto.ConversationResponse;
+import com.socialnetwork.chat_service.dto.ConversationSummaryResponse;
+import com.socialnetwork.chat_service.dto.MarkReadRequest;
+import com.socialnetwork.chat_service.dto.MessageResponse;
+import com.socialnetwork.chat_service.dto.ParticipantDto;
+import com.socialnetwork.chat_service.dto.RoomEvent;
+import com.socialnetwork.chat_service.dto.UpdateConversationRequest;
+import com.socialnetwork.chat_service.dto.UpdateMemberRoleRequest;
 import com.socialnetwork.chat_service.enums.ChatLabel;
 import com.socialnetwork.chat_service.enums.ConversationRole;
 import com.socialnetwork.chat_service.enums.MessageType;
+import com.socialnetwork.chat_service.mapper.MessageMapper;
 import com.socialnetwork.chat_service.model.ChatMessage;
 import com.socialnetwork.chat_service.model.ChatRoom;
 import com.socialnetwork.chat_service.model.RoomMember;
@@ -13,18 +22,33 @@ import com.socialnetwork.chat_service.repository.jpa.ChatRoomRepository;
 import com.socialnetwork.chat_service.repository.jpa.RoomMemberRepository;
 import com.socialnetwork.chat_service.repository.mongo.ChatMessageRepository;
 import com.socialnetwork.chat_service.service.ConversationService;
+import com.socialnetwork.chat_service.service.UserDirectory;
+import com.socialnetwork.chat_service.support.TransactionSupport;
+import com.socialnetwork.common.constants.WebSocketConstants;
+import com.socialnetwork.common.dto.UserSummary;
 import com.socialnetwork.common.exception.AccessDeniedException;
 import com.socialnetwork.common.exception.BadRequestException;
+import com.socialnetwork.common.exception.ConflictException;
 import com.socialnetwork.common.exception.ResourceNotFoundException;
+import com.socialnetwork.common.security.SecurityUtils;
 import java.time.Instant;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -34,211 +58,190 @@ public class ConversationServiceImpl implements ConversationService {
   private final ChatRoomRepository chatRoomRepository;
   private final RoomMemberRepository roomMemberRepository;
   private final ChatMessageRepository chatMessageRepository;
-
-  private final UserClient userClient;
+  private final ChatRoomWriter chatRoomWriter;
+  private final UserDirectory userDirectory;
   private final SimpMessagingTemplate messagingTemplate;
 
-  // Lấy ID người dùng từ Security Context
-  private Long getCurrentUserId() {
-    String userIdStr =
-        (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    return Long.parseLong(userIdStr);
+  // --------------------------------------------------------------- creation
+
+  @Override
+  public ConversationResponse createConversation(ConversationCreateRequest req) {
+    Long creatorId = SecurityUtils.getCurrentUserId();
+    Set<Long> others = otherMembers(req.getMemberIds(), creatorId);
+
+    if (req.isGroup()) {
+      if (!StringUtils.hasText(req.getTitle())) {
+        throw new BadRequestException("A group conversation requires a title");
+      }
+      if (others.isEmpty()) {
+        throw new BadRequestException("A group conversation requires at least one other member");
+      }
+      ChatRoom room =
+          chatRoomWriter.createGroupRoom(creatorId, req.getTitle(), req.getMediaUrl(), others);
+      UserSummary creator = userDirectory.getSummary(creatorId);
+      saveAndSendSystemMessage(room.getId(), creator, creator.displayName() + " đã tạo nhóm.");
+      return mapToResponse(room);
+    }
+
+    if (others.size() != 1) {
+      throw new BadRequestException("A private conversation must have exactly one other member");
+    }
+    return openPrivateRoom(creatorId, others.iterator().next());
   }
 
   @Override
-  @Transactional
-  public ConversationResponse createConversation(ConversationCreateRequest req) {
-    Long creatorId = getCurrentUserId();
-    System.out.println("Người tạo" + creatorId);
-    UserProfileDto creatorProfile = userClient.getUserProfile(creatorId);
-
-    if (Boolean.FALSE.equals(req.getIsGroup())) {
-      if (req.getMemberIds() == null || req.getMemberIds().isEmpty()) {
-        throw new BadRequestException("Private conversation must have a recipient.");
-      }
-
-      Long recipientId = req.getMemberIds().get(0);
-      if (creatorId.equals(recipientId)) {
-        throw new BadRequestException("Cannot create conversation with yourself.");
-      }
-
-      Optional<ChatRoom> existing =
-          chatRoomRepository.findExistingPrivateRoom(creatorId, recipientId);
-      if (existing.isPresent()) {
-        return mapToResponse(existing.get());
-      }
+  public ConversationResponse createConversationForFriends(Long userId1, Long userId2) {
+    if (userId1 == null || userId2 == null || userId1.equals(userId2)) {
+      throw new IllegalArgumentException("FriendAcceptedEvent needs two distinct user ids");
     }
-
-    ChatRoom room =
-        ChatRoom.builder()
-            .isGroup(Boolean.TRUE.equals(req.getIsGroup()))
-            .title(req.getTitle())
-            .mediaUrl(req.getMediaUrl())
-            .createdAt(Instant.now())
-            .updatedAt(Instant.now())
-            .build();
-
-    ChatRoom savedRoom = chatRoomRepository.save(room);
-
-    List<RoomMember> membersToSave = new ArrayList<>();
-    membersToSave.add(
-        RoomMember.builder()
-            .id(new RoomMemberId(savedRoom.getId(), creatorId))
-            .chatRoom(savedRoom)
-            .joinedAt(Instant.now())
-            .role(ConversationRole.OWNER)
-            .build());
-
-    if (req.getMemberIds() != null) {
-      Set<Long> uniqueIds = new HashSet<>(req.getMemberIds());
-      uniqueIds.remove(creatorId);
-
-      for (Long memberId : uniqueIds) {
-        membersToSave.add(
-            RoomMember.builder()
-                .id(new RoomMemberId(savedRoom.getId(), memberId))
-                .chatRoom(savedRoom)
-                .joinedAt(Instant.now())
-                .role(ConversationRole.MEMBER)
-                .build());
-      }
-    }
-    roomMemberRepository.saveAll(membersToSave);
-
-    if (Boolean.TRUE.equals(savedRoom.getIsGroup())) {
-      saveAndSendSystemMessage(
-          savedRoom.getId(), creatorProfile, creatorProfile.getDisplayName() + " đã tạo nhóm.");
-    }
-
-    return mapToResponse(savedRoom);
+    return openPrivateRoom(userId1, userId2);
   }
+
+  @Override
+  public void archiveConversationForFriends(Long userId1, Long userId2) {
+    if (userId1 == null || userId2 == null || userId1.equals(userId2)) {
+      throw new IllegalArgumentException("FriendshipDeletedEvent needs two distinct user ids");
+    }
+    Optional<ChatRoom> room =
+        chatRoomRepository.findByPairKey(ChatRoom.pairKeyOf(userId1, userId2));
+    if (room.isEmpty()) {
+      log.debug("No private room to archive for users {} and {}", userId1, userId2);
+      return;
+    }
+
+    ChatRoom archived = room.get();
+    chatRoomWriter.archive(archived);
+    messagingTemplate.convertAndSend(
+        conversationTopic(archived.getId()), RoomEvent.conversationArchived(archived.getId()));
+    log.info("Archived private conversation {} after friendship removal", archived.getId());
+  }
+
+  /** Returns the existing private room, creating it when needed - including when a race is lost. */
+  private ConversationResponse openPrivateRoom(Long creatorId, Long recipientId) {
+    String pairKey = ChatRoom.pairKeyOf(creatorId, recipientId);
+    Optional<ChatRoom> existing = chatRoomRepository.findByPairKey(pairKey);
+    if (existing.isPresent()) {
+      return mapToResponse(chatRoomWriter.reactivate(existing.get()));
+    }
+
+    try {
+      ChatRoom room =
+          chatRoomWriter.createPrivateRoom(creatorId, recipientId, ConversationRole.MEMBER);
+      log.info(
+          "Created private conversation {} for users {} and {}",
+          room.getId(),
+          creatorId,
+          recipientId);
+      return mapToResponse(room);
+    } catch (DataIntegrityViolationException e) {
+      log.debug("Concurrent creation of private room {}, reusing the winner", pairKey);
+      return chatRoomRepository
+          .findByPairKey(pairKey)
+          .map(this::mapToResponse)
+          .orElseThrow(() -> new ConflictException("Could not open the private conversation"));
+    }
+  }
+
+  // ------------------------------------------------------------ group admin
 
   @Override
   @Transactional
   public ConversationSummaryResponse updateConversation(
       Long currentUserId, UpdateConversationRequest request) {
-    RoomMember member = checkGroupAndGetMember(request.getConversationId(), currentUserId);
+    RoomMember member = requireGroupMember(request.getConversationId(), currentUserId);
     ChatRoom room = member.getChatRoom();
+    requireManager(member, "Only the owner or an admin can update the group");
 
-    if (member.getRole() == ConversationRole.MEMBER) {
-      throw new AccessDeniedException("Only OWNER or ADMIN can update group information.");
-    }
-
-    boolean isUpdated = false;
-    if (request.getTitle() != null && !request.getTitle().isBlank()) {
+    boolean updated = false;
+    if (StringUtils.hasText(request.getTitle())) {
       room.setTitle(request.getTitle());
-      isUpdated = true;
+      updated = true;
     }
-
-    if (request.getMediaUrl() != null && !request.getMediaUrl().isBlank()) {
+    if (StringUtils.hasText(request.getMediaUrl())) {
       room.setMediaUrl(request.getMediaUrl());
-      isUpdated = true;
+      updated = true;
     }
 
-    if (isUpdated) {
-      room.setUpdatedAt(Instant.now());
-      chatRoomRepository.save(room);
-
-      UserProfileDto profile = userClient.getUserProfile(currentUserId);
+    if (updated) {
+      touch(room);
+      UserSummary actor = userDirectory.getSummary(currentUserId);
       saveAndSendSystemMessage(
-          room.getId(), profile, profile.getDisplayName() + " đã cập nhật thông tin nhóm.");
+          room.getId(), actor, actor.displayName() + " đã cập nhật thông tin nhóm.");
     }
-
-    return toConversationSummaryDto(room, member, currentUserId);
+    return toSummary(room, member, currentUserId);
   }
 
   @Override
   @Transactional
   public ConversationSummaryResponse addMembersToGroup(
       Long currentUserId, AddMembersRequest request) {
-    RoomMember currentUserMember =
-        checkGroupAndGetMember(request.getConversationId(), currentUserId);
-    ChatRoom room = currentUserMember.getChatRoom();
+    RoomMember actorMember = requireGroupMember(request.getConversationId(), currentUserId);
+    ChatRoom room = actorMember.getChatRoom();
+    requireManager(actorMember, "Only the owner or an admin can add members");
 
-    if (currentUserMember.getRole() == ConversationRole.MEMBER) {
-      throw new AccessDeniedException("Only OWNER or ADMIN can add new members");
+    Set<Long> existing = new HashSet<>(roomMemberRepository.findUserIdsByRoomId(room.getId()));
+    List<Long> newMemberIds =
+        request.getUserIds().stream().distinct().filter(id -> !existing.contains(id)).toList();
+    if (newMemberIds.isEmpty()) {
+      return toSummary(room, actorMember, currentUserId);
     }
 
-    Set<Long> existingMemberIds =
-        roomMemberRepository.findByIdRoomId(room.getId()).stream()
-            .map(rm -> rm.getId().getUserId())
-            .collect(Collectors.toSet());
+    Map<Long, UserSummary> summaries =
+        userDirectory.getSummaries(concat(newMemberIds, currentUserId));
 
-    List<Long> newMemberIds =
-        request.getUserIds().stream()
-            .filter(id -> !existingMemberIds.contains(id))
-            .distinct()
-            .toList();
-
-    if (newMemberIds.isEmpty())
-      return toConversationSummaryDto(room, currentUserMember, currentUserId);
-
-    List<RoomMember> newMembers = new ArrayList<>();
-    List<String> addedNames = new ArrayList<>();
-
-    // Fetch user profiles & create members
-    for (Long newId : newMemberIds) {
-      UserProfileDto profile = userClient.getUserProfile(newId);
-      addedNames.add(profile.getDisplayName());
-      newMembers.add(
+    List<RoomMember> members = new ArrayList<>();
+    for (Long newMemberId : newMemberIds) {
+      members.add(
           RoomMember.builder()
-              .id(new RoomMemberId(room.getId(), newId))
+              .id(new RoomMemberId(room.getId(), newMemberId))
               .chatRoom(room)
-              .role(ConversationRole.MEMBER)
               .joinedAt(Instant.now())
+              .role(ConversationRole.MEMBER)
               .build());
     }
-    roomMemberRepository.saveAll(newMembers);
+    roomMemberRepository.saveAll(members);
+    touch(room);
 
-    room.setUpdatedAt(Instant.now());
-    chatRoomRepository.save(room);
-
-    UserProfileDto currentUserProfile = userClient.getUserProfile(currentUserId);
-    String addedNamesStr = String.join(", ", addedNames);
+    UserSummary actor = summaries.get(currentUserId);
+    String added =
+        String.join(
+            ", ", newMemberIds.stream().map(id -> summaries.get(id).displayName()).toList());
     saveAndSendSystemMessage(
-        room.getId(),
-        currentUserProfile,
-        currentUserProfile.getDisplayName() + " đã thêm " + addedNamesStr + " vào nhóm.");
-
-    return toConversationSummaryDto(room, currentUserMember, currentUserId);
+        room.getId(), actor, actor.displayName() + " đã thêm " + added + " vào nhóm.");
+    return toSummary(room, actorMember, currentUserId);
   }
 
   @Override
   @Transactional
   public ConversationSummaryResponse removeMemberFromGroup(
       Long currentUserId, Long conversationId, Long userIdToRemove) {
-    RoomMember currentUserMember = checkGroupAndGetMember(conversationId, currentUserId);
-    ChatRoom room = currentUserMember.getChatRoom();
+    RoomMember actorMember = requireGroupMember(conversationId, currentUserId);
+    ChatRoom room = actorMember.getChatRoom();
 
     if (currentUserId.equals(userIdToRemove)) {
-      throw new BadRequestException("Use leaveConversation to remove yourself.");
+      throw new BadRequestException("Use the leave endpoint to remove yourself");
     }
 
-    RoomMember targetMember =
+    RoomMember target =
         roomMemberRepository
             .findByIdRoomIdAndIdUserId(conversationId, userIdToRemove)
-            .orElseThrow(() -> new ResourceNotFoundException("Member not found in group."));
+            .orElseThrow(() -> new ResourceNotFoundException("Member not found in this group"));
+    validateRemovePermission(actorMember.getRole(), target.getRole());
 
-    validateRemovePermission(currentUserMember.getRole(), targetMember.getRole());
+    roomMemberRepository.delete(target);
+    touch(room);
 
-    // Lấy tên người bị xóa để thông báo
-    UserProfileDto targetProfile = userClient.getUserProfile(userIdToRemove);
-
-    roomMemberRepository.delete(targetMember);
-
-    room.setUpdatedAt(Instant.now());
-    chatRoomRepository.save(room);
-
-    UserProfileDto currentUserProfile = userClient.getUserProfile(currentUserId);
+    Map<Long, UserSummary> summaries =
+        userDirectory.getSummaries(List.of(currentUserId, userIdToRemove));
+    UserSummary actor = summaries.get(currentUserId);
     saveAndSendSystemMessage(
         room.getId(),
-        currentUserProfile,
-        currentUserProfile.getDisplayName()
+        actor,
+        actor.displayName()
             + " đã xóa "
-            + targetProfile.getDisplayName()
+            + summaries.get(userIdToRemove).displayName()
             + " khỏi nhóm.");
-
-    return toConversationSummaryDto(room, currentUserMember, currentUserId);
+    return toSummary(room, actorMember, currentUserId);
   }
 
   @Override
@@ -248,33 +251,28 @@ public class ConversationServiceImpl implements ConversationService {
         roomMemberRepository
             .findByIdRoomIdAndIdUserId(conversationId, currentUserId)
             .orElseThrow(
-                () -> new AccessDeniedException("Not a member of conversation " + conversationId));
-
+                () -> new AccessDeniedException("You are not a member of this conversation"));
     ChatRoom room = member.getChatRoom();
 
     if (member.getRole() == ConversationRole.OWNER) {
-      long memberCount = roomMemberRepository.countByIdRoomId(conversationId);
-      if (memberCount > 1) {
-        throw new BadRequestException("Owner must transfer ownership before leaving.");
-      } else {
-        // Xóa phòng bên Postgres
-        chatRoomRepository.delete(room);
-
-        Map<String, Object> payload =
-            Map.of("type", "EVENT_CONVERSATION_DELETED", "conversationId", conversationId);
-        messagingTemplate.convertAndSend("/topic/conversation/" + conversationId, (Object) payload);
-        return;
+      if (roomMemberRepository.countByIdRoomId(conversationId) > 1) {
+        throw new BadRequestException("Transfer ownership before leaving the group");
       }
+      chatRoomRepository.delete(room);
+      TransactionSupport.afterCommit(
+          () ->
+              messagingTemplate.convertAndSend(
+                  conversationTopic(conversationId),
+                  RoomEvent.conversationDeleted(conversationId)));
+      log.info("Conversation {} deleted by its last member {}", conversationId, currentUserId);
+      return;
     }
 
     roomMemberRepository.delete(member);
-
-    if (Boolean.TRUE.equals(room.getIsGroup())) {
-      room.setUpdatedAt(Instant.now());
-      chatRoomRepository.save(room);
-
-      UserProfileDto profile = userClient.getUserProfile(currentUserId);
-      saveAndSendSystemMessage(room.getId(), profile, profile.getDisplayName() + " đã rời nhóm.");
+    if (room.isGroup()) {
+      touch(room);
+      UserSummary actor = userDirectory.getSummary(currentUserId);
+      saveAndSendSystemMessage(room.getId(), actor, actor.displayName() + " đã rời nhóm.");
     }
   }
 
@@ -282,119 +280,80 @@ public class ConversationServiceImpl implements ConversationService {
   @Transactional
   public ConversationSummaryResponse updateMemberRole(
       Long currentUserId, UpdateMemberRoleRequest request) {
-    RoomMember currentUserMember =
-        checkGroupAndGetMember(request.getConversationId(), currentUserId);
-    ChatRoom room = currentUserMember.getChatRoom();
+    RoomMember actorMember = requireGroupMember(request.getConversationId(), currentUserId);
+    ChatRoom room = actorMember.getChatRoom();
+    requireManager(actorMember, "Only the owner or an admin can change roles");
 
-    if (currentUserMember.getRole() == ConversationRole.MEMBER) {
-      throw new AccessDeniedException("Permission denied.");
-    }
-
-    RoomMember targetMember =
+    RoomMember target =
         roomMemberRepository
             .findByIdRoomIdAndIdUserId(request.getConversationId(), request.getUserIdToChange())
-            .orElseThrow(() -> new ResourceNotFoundException("Member not found."));
+            .orElseThrow(() -> new ResourceNotFoundException("Member not found in this group"));
 
-    if (targetMember.getRole() == ConversationRole.OWNER) {
-      throw new BadRequestException("Cannot change OWNER role.");
+    if (target.getRole() == ConversationRole.OWNER) {
+      throw new BadRequestException("The owner role cannot be changed");
     }
-
     if (request.getNewRole() == ConversationRole.OWNER) {
-      throw new BadRequestException("Cannot assign OWNER via this API.");
+      throw new BadRequestException("The owner role cannot be granted through this endpoint");
+    }
+    if (actorMember.getRole() == ConversationRole.ADMIN
+        && target.getRole() == ConversationRole.ADMIN) {
+      throw new AccessDeniedException("An admin cannot change the role of another admin");
     }
 
-    targetMember.setRole(request.getNewRole());
-    roomMemberRepository.save(targetMember);
+    target.setRole(request.getNewRole());
+    roomMemberRepository.save(target);
+    touch(room);
 
-    room.setUpdatedAt(Instant.now());
-    chatRoomRepository.save(room);
-
-    UserProfileDto currentProfile = userClient.getUserProfile(currentUserId);
-    UserProfileDto targetProfile = userClient.getUserProfile(request.getUserIdToChange());
-
+    Map<Long, UserSummary> summaries =
+        userDirectory.getSummaries(List.of(currentUserId, request.getUserIdToChange()));
+    UserSummary actor = summaries.get(currentUserId);
     saveAndSendSystemMessage(
         room.getId(),
-        currentProfile,
-        targetProfile.getDisplayName()
-            + " đã được thăng cấp thành "
+        actor,
+        summaries.get(request.getUserIdToChange()).displayName()
+            + " đã được đổi vai trò thành "
             + request.getNewRole().name()
             + ".");
-
-    return toConversationSummaryDto(room, currentUserMember, currentUserId);
+    return toSummary(room, actorMember, currentUserId);
   }
 
-  @Override
-  public void markMessageAsRead(Long userId, MarkReadRequest request) {
-    if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(request.getConversationId(), userId)) {
-      throw new AccessDeniedException("Not a member.");
-    }
-
-    ChatMessage message =
-        chatMessageRepository
-            .findById(request.getMessageId())
-            .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
-
-    List<Long> readBy = message.getReadBy();
-    if (readBy == null) {
-      readBy = new ArrayList<>();
-    }
-
-    if (!readBy.contains(userId)) {
-      readBy.add(userId);
-      message.setReadBy(readBy);
-      chatMessageRepository.save(message);
-
-      Map<String, Object> payload =
-          Map.of(
-              "type", "EVENT_READ",
-              "conversationId", request.getConversationId(),
-              "messageId", message.getId(),
-              "readerId", userId,
-              "timestamp", Instant.now().toString());
-      messagingTemplate.convertAndSend(
-          "/topic/conversation/" + request.getConversationId(), (Object) payload);
-    }
-  }
-
-  @Override
-  @Transactional
-  public void addLabelToConversation(Long roomId, ChatLabel label) {
-    Long currentUserId = getCurrentUserId();
-
-    RoomMember member =
-        roomMemberRepository
-            .findByIdRoomIdAndIdUserId(roomId, currentUserId)
-            .orElseThrow(
-                () -> new AccessDeniedException("You are not a member of this conversation"));
-
-    member.getLabels().add(label);
-    roomMemberRepository.save(member);
-  }
-
-  @Override
-  @Transactional
-  public void removeLabelFromConversation(Long roomId, ChatLabel label) {
-    Long currentUserId = getCurrentUserId();
-
-    RoomMember member =
-        roomMemberRepository
-            .findByIdRoomIdAndIdUserId(roomId, currentUserId)
-            .orElseThrow(
-                () -> new AccessDeniedException("You are not a member of this conversation"));
-
-    member.getLabels().remove(label);
-    roomMemberRepository.save(member);
-  }
+  // ----------------------------------------------------------------- reads
 
   @Override
   @Transactional(readOnly = true)
   public List<ConversationSummaryResponse> getUserConversations(Long userId) {
-    List<RoomMember> members = roomMemberRepository.findRoomsByUserId(userId);
+    List<RoomMember> memberships = roomMemberRepository.findActiveRoomsByUserId(userId);
+    if (memberships.isEmpty()) {
+      return List.of();
+    }
 
-    return members.stream()
-        .map(member -> toConversationSummaryDto(member.getChatRoom(), member, userId))
-        .sorted((a, b) -> b.getUpdatedAt().compareTo(a.getUpdatedAt()))
-        .collect(Collectors.toList());
+    List<Long> roomIds = memberships.stream().map(m -> m.getId().getRoomId()).toList();
+    Map<Long, List<RoomMember>> membersByRoom = new LinkedHashMap<>();
+    Set<Long> participantIds = new LinkedHashSet<>();
+    for (RoomMember member : roomMemberRepository.findByIdRoomIdIn(roomIds)) {
+      membersByRoom
+          .computeIfAbsent(member.getId().getRoomId(), id -> new ArrayList<>())
+          .add(member);
+      participantIds.add(member.getId().getUserId());
+    }
+
+    // One call to user-service for every participant of every conversation.
+    Map<Long, UserSummary> summaries = userDirectory.getSummaries(participantIds);
+
+    return memberships.stream()
+        .map(
+            membership ->
+                buildSummary(
+                    membership.getChatRoom(),
+                    membership,
+                    userId,
+                    membersByRoom.getOrDefault(membership.getId().getRoomId(), List.of()),
+                    summaries))
+        .sorted(
+            Comparator.comparing(
+                ConversationSummaryResponse::getUpdatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())))
+        .toList();
   }
 
   @Override
@@ -403,180 +362,222 @@ public class ConversationServiceImpl implements ConversationService {
     ChatRoom room =
         chatRoomRepository
             .findById(conversationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
-
-    RoomMember currentMember =
-        roomMemberRepository
-            .findByIdRoomIdAndIdUserId(conversationId, currentUserId)
-            .orElseThrow(() -> new AccessDeniedException("Not a member."));
-
-    return toConversationSummaryDto(room, currentMember, currentUserId);
-  }
-
-  // ------------------------- HELPER METHODS -------------------------
-
-  private void saveAndSendSystemMessage(Long roomId, UserProfileDto senderProfile, String content) {
-    ChatMessage sysMsg =
-        ChatMessage.builder()
-            .roomId(roomId)
-            .senderId(senderProfile.getId())
-            .senderName(senderProfile.getDisplayName())
-            .senderAvatar(senderProfile.getAvatarUrl())
-            .content(content)
-            .type(MessageType.SYSTEM)
-            .createdAt(Instant.now())
-            .isDeleted(false)
-            .build();
-
-    chatMessageRepository.save(sysMsg);
-
-    chatRoomRepository
-        .findById(roomId)
-        .ifPresent(
-            r -> {
-              r.setUpdatedAt(Instant.now());
-              chatRoomRepository.save(r);
-            });
-
-    messagingTemplate.convertAndSend("/topic/conversation/" + roomId, sysMsg);
-  }
-
-  private ConversationSummaryResponse toConversationSummaryDto(
-      ChatRoom room, RoomMember currentMember, Long viewerId) {
-    ChatMessage lastMessage =
-        chatMessageRepository.findFirstByRoomIdOrderByCreatedAtDesc(room.getId()).orElse(null);
-    Map<String, Object> lastMsgMap =
-        (lastMessage != null) ? convertMessageToMap(lastMessage) : null;
-
-    List<RoomMember> members = roomMemberRepository.findByIdRoomId(room.getId());
-    List<ParticipantDto> participants = new ArrayList<>();
-
-    for (RoomMember m : members) {
-      UserProfileDto profile = userClient.getUserProfile(m.getId().getUserId());
-      participants.add(
-          ParticipantDto.builder()
-              .id(m.getId().getUserId())
-              .displayName(profile.getDisplayName())
-              .avatarUrl(profile.getAvatarUrl())
-              .role(m.getRole().name())
-              .build());
-    }
-
-    String finalTitle = room.getTitle();
-    String finalMediaUrl = room.getMediaUrl();
-
-    if (Boolean.FALSE.equals(room.getIsGroup())) {
-      ParticipantDto otherUser =
-          participants.stream().filter(p -> !p.getId().equals(viewerId)).findFirst().orElse(null);
-
-      if (otherUser != null) {
-        finalTitle = otherUser.getDisplayName();
-        finalMediaUrl = otherUser.getAvatarUrl();
-      }
-    }
-
-    return ConversationSummaryResponse.builder()
-        .id(room.getId())
-        .title(finalTitle)
-        .mediaUrl(finalMediaUrl)
-        .isGroup(room.getIsGroup())
-        .lastMessage(lastMsgMap)
-        .participants(participants)
-        .labels(currentMember != null ? currentMember.getLabels() : Collections.emptySet())
-        .updatedAt(room.getUpdatedAt())
-        .build();
-  }
-
-  private RoomMember checkGroupAndGetMember(Long roomId, Long userId) {
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Conversation " + conversationId + " not found"));
     RoomMember member =
         roomMemberRepository
-            .findByIdRoomIdAndIdUserId(roomId, userId)
-            .orElseThrow(() -> new AccessDeniedException("Not a member"));
-    if (Boolean.FALSE.equals(member.getChatRoom().getIsGroup())) {
-      throw new BadRequestException("Action only valid for groups.");
+            .findByIdRoomIdAndIdUserId(conversationId, currentUserId)
+            .orElseThrow(
+                () -> new AccessDeniedException("You are not a member of this conversation"));
+    return toSummary(room, member, currentUserId);
+  }
+
+  // ------------------------------------------------------------- read state
+
+  @Override
+  public void markMessageAsRead(Long userId, MarkReadRequest request) {
+    if (!roomMemberRepository.existsByIdRoomIdAndIdUserId(request.getConversationId(), userId)) {
+      throw new AccessDeniedException("You are not a member of this conversation");
     }
-    return member;
-  }
 
-  private void validateRemovePermission(ConversationRole actor, ConversationRole target) {
-    if (actor == ConversationRole.MEMBER) throw new AccessDeniedException("Permission denied.");
-    if (target == ConversationRole.OWNER) throw new AccessDeniedException("Cannot remove Owner.");
-    if (actor == ConversationRole.ADMIN && target == ConversationRole.ADMIN)
-      throw new AccessDeniedException("Admin cannot remove another Admin.");
-  }
+    ChatMessage message =
+        chatMessageRepository
+            .findById(request.getMessageId())
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Message " + request.getMessageId() + " not found"));
 
-  private ConversationResponse mapToResponse(ChatRoom room) {
-    List<Long> memberIds =
-        roomMemberRepository.findByIdRoomId(room.getId()).stream()
-            .map(rm -> rm.getId().getUserId())
-            .toList();
-    return ConversationResponse.builder()
-        .id(room.getId())
-        .isGroup(room.getIsGroup())
-        .title(room.getTitle())
-        .mediaUrl(room.getMediaUrl())
-        .createdAt(room.getCreatedAt())
-        .memberIds(memberIds)
-        .build();
-  }
-
-  private Map<String, Object> convertMessageToMap(ChatMessage msg) {
-    if (Boolean.TRUE.equals(msg.getIsDeleted()) || Boolean.TRUE.equals(msg.getIsSystemBan())) {
-      return Map.of(
-          "id",
-          msg.getId(),
-          "content",
-          "Tin nhắn đã bị gỡ bỏ",
-          "type",
-          "REVOKED",
-          "createdAt",
-          msg.getCreatedAt().toString());
+    if (!request.getConversationId().equals(message.getRoomId())) {
+      throw new ResourceNotFoundException(
+          "Message " + request.getMessageId() + " is not part of conversation "
+              + request.getConversationId());
     }
-    return Map.of(
-        "id", msg.getId(),
-        "content", msg.getContent() != null ? msg.getContent() : "",
-        "type", msg.getType() != null ? msg.getType().name() : MessageType.TEXT.name(),
-        "senderName", msg.getSenderName() != null ? msg.getSenderName() : "",
-        "createdAt", msg.getCreatedAt().toString());
+
+    List<Long> readBy =
+        message.getReadBy() == null ? new ArrayList<>() : new ArrayList<>(message.getReadBy());
+    if (readBy.contains(userId)) {
+      return;
+    }
+
+    readBy.add(userId);
+    message.setReadBy(readBy);
+    chatMessageRepository.save(message);
+
+    TransactionSupport.afterCommit(
+        () ->
+            messagingTemplate.convertAndSend(
+                conversationTopic(request.getConversationId()),
+                RoomEvent.messageRead(request.getConversationId(), message.getId(), userId)));
+  }
+
+  // ---------------------------------------------------------------- labels
+
+  @Override
+  @Transactional
+  public void addLabelToConversation(Long currentUserId, Long roomId, ChatLabel label) {
+    RoomMember member = requireMember(roomId, currentUserId);
+    member.getLabels().add(label);
+    roomMemberRepository.save(member);
   }
 
   @Override
   @Transactional
-  public ConversationResponse createConversationForFriends(Long userId1, Long userId2) {
-    // Kiểm tra xem conversation đã tồn tại chưa
-    Optional<ChatRoom> existing = chatRoomRepository.findExistingPrivateRoom(userId1, userId2);
-    if (existing.isPresent()) {
-      log.info("Conversation already exists between users {} and {}", userId1, userId2);
-      return mapToResponse(existing.get());
+  public void removeLabelFromConversation(Long currentUserId, Long roomId, ChatLabel label) {
+    RoomMember member = requireMember(roomId, currentUserId);
+    member.getLabels().remove(label);
+    roomMemberRepository.save(member);
+  }
+
+  // --------------------------------------------------------------- helpers
+
+  private void saveAndSendSystemMessage(Long roomId, UserSummary actor, String content) {
+    ChatMessage saved =
+        chatMessageRepository.save(
+            ChatMessage.builder()
+                .roomId(roomId)
+                .senderId(actor.id())
+                .senderName(actor.displayName())
+                .senderAvatar(actor.avatarUrl())
+                .content(content)
+                .type(MessageType.SYSTEM)
+                .createdAt(Instant.now())
+                .readBy(new ArrayList<>())
+                .isDeleted(false)
+                .isSystemBan(false)
+                .build());
+
+    MessageResponse payload = MessageMapper.toResponse(saved);
+    TransactionSupport.afterCommit(
+        () -> messagingTemplate.convertAndSend(conversationQueue(roomId), payload));
+  }
+
+  private ConversationSummaryResponse toSummary(
+      ChatRoom room, RoomMember currentMember, Long viewerId) {
+    List<RoomMember> members = roomMemberRepository.findByIdRoomId(room.getId());
+    Map<Long, UserSummary> summaries =
+        userDirectory.getSummaries(members.stream().map(m -> m.getId().getUserId()).toList());
+    return buildSummary(room, currentMember, viewerId, members, summaries);
+  }
+
+  private ConversationSummaryResponse buildSummary(
+      ChatRoom room,
+      RoomMember currentMember,
+      Long viewerId,
+      List<RoomMember> members,
+      Map<Long, UserSummary> summaries) {
+
+    List<ParticipantDto> participants =
+        members.stream()
+            .map(
+                member -> {
+                  UserSummary summary = summaries.get(member.getId().getUserId());
+                  return ParticipantDto.builder()
+                      .id(member.getId().getUserId())
+                      .displayName(summary == null ? null : summary.displayName())
+                      .avatarUrl(summary == null ? null : summary.avatarUrl())
+                      .role(member.getRole())
+                      .build();
+                })
+            .toList();
+
+    String title = room.getTitle();
+    String mediaUrl = room.getMediaUrl();
+    if (!room.isGroup()) {
+      ParticipantDto other =
+          participants.stream().filter(p -> !p.getId().equals(viewerId)).findFirst().orElse(null);
+      if (other != null) {
+        title = other.getDisplayName();
+        mediaUrl = other.getAvatarUrl();
+      }
     }
 
-    // Tạo conversation mới
-    ChatRoom room =
-        ChatRoom.builder().isGroup(false).createdAt(Instant.now()).updatedAt(Instant.now()).build();
+    MessageResponse lastMessage =
+        chatMessageRepository
+            .findFirstByRoomIdOrderByCreatedAtDesc(room.getId())
+            .map(MessageMapper::toResponse)
+            .orElse(null);
 
-    ChatRoom savedRoom = chatRoomRepository.save(room);
+    return ConversationSummaryResponse.builder()
+        .id(room.getId())
+        .title(title)
+        .mediaUrl(mediaUrl)
+        .isGroup(room.isGroup())
+        .lastMessage(lastMessage)
+        .participants(participants)
+        .labels(currentMember == null ? Set.of() : currentMember.getLabels())
+        .updatedAt(room.getUpdatedAt())
+        .build();
+  }
 
-    // Thêm cả 2 người vào conversation
-    List<RoomMember> membersToSave = new ArrayList<>();
-    membersToSave.add(
-        RoomMember.builder()
-            .id(new RoomMemberId(savedRoom.getId(), userId1))
-            .chatRoom(savedRoom)
-            .joinedAt(Instant.now())
-            .role(ConversationRole.MEMBER)
-            .build());
+  private ConversationResponse mapToResponse(ChatRoom room) {
+    return ConversationResponse.builder()
+        .id(room.getId())
+        .isGroup(room.isGroup())
+        .title(room.getTitle())
+        .mediaUrl(room.getMediaUrl())
+        .createdAt(room.getCreatedAt())
+        .memberIds(roomMemberRepository.findUserIdsByRoomId(room.getId()))
+        .build();
+  }
 
-    membersToSave.add(
-        RoomMember.builder()
-            .id(new RoomMemberId(savedRoom.getId(), userId2))
-            .chatRoom(savedRoom)
-            .joinedAt(Instant.now())
-            .role(ConversationRole.MEMBER)
-            .build());
+  private RoomMember requireMember(Long roomId, Long userId) {
+    return roomMemberRepository
+        .findByIdRoomIdAndIdUserId(roomId, userId)
+        .orElseThrow(() -> new AccessDeniedException("You are not a member of this conversation"));
+  }
 
-    roomMemberRepository.saveAll(membersToSave);
+  private RoomMember requireGroupMember(Long roomId, Long userId) {
+    RoomMember member = requireMember(roomId, userId);
+    if (!member.getChatRoom().isGroup()) {
+      throw new BadRequestException("This action is only valid for group conversations");
+    }
+    return member;
+  }
 
-    log.info("Successfully created private conversation between users {} and {}", userId1, userId2);
-    return mapToResponse(savedRoom);
+  private static void requireManager(RoomMember member, String message) {
+    if (member.getRole() == ConversationRole.MEMBER) {
+      throw new AccessDeniedException(message);
+    }
+  }
+
+  private static void validateRemovePermission(ConversationRole actor, ConversationRole target) {
+    if (actor == ConversationRole.MEMBER) {
+      throw new AccessDeniedException("Only the owner or an admin can remove members");
+    }
+    if (target == ConversationRole.OWNER) {
+      throw new AccessDeniedException("The owner cannot be removed");
+    }
+    if (actor == ConversationRole.ADMIN && target == ConversationRole.ADMIN) {
+      throw new AccessDeniedException("An admin cannot remove another admin");
+    }
+  }
+
+  private void touch(ChatRoom room) {
+    room.setUpdatedAt(Instant.now());
+    chatRoomRepository.save(room);
+  }
+
+  private static Set<Long> otherMembers(Collection<Long> memberIds, Long creatorId) {
+    Set<Long> others = new LinkedHashSet<>(memberIds == null ? List.<Long>of() : memberIds);
+    others.remove(null);
+    others.remove(creatorId);
+    return others;
+  }
+
+  private static List<Long> concat(List<Long> ids, Long extra) {
+    List<Long> all = new ArrayList<>(ids);
+    all.add(extra);
+    return all;
+  }
+
+  private static String conversationQueue(Long roomId) {
+    return WebSocketConstants.CONVERSATION_QUEUE + "/" + roomId;
+  }
+
+  private static String conversationTopic(Long roomId) {
+    return WebSocketConstants.CONVERSATION_TOPIC + "/" + roomId;
   }
 }

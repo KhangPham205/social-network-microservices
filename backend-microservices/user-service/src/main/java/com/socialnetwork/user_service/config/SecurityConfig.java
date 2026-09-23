@@ -1,42 +1,49 @@
 package com.socialnetwork.user_service.config;
 
+import com.socialnetwork.common.constants.ApiConstants;
+import com.socialnetwork.common.constants.SecurityConstants;
+import com.socialnetwork.common.security.JwtSecurityConfigurer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import com.socialnetwork.common.security.JwtAuthenticationFilter;
 
+/**
+ * Resource-server rules: everything under {@code /api/v1/users} needs a valid JWT, admin endpoints
+ * need {@code ROLE_ADMIN} plus the matching permission ({@code @PreAuthorize}), and {@code
+ * /api/v1/users/internal/**} is only reachable with the shared internal token (rule added by {@link
+ * JwtSecurityConfigurer}).
+ */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-  private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  public static final String ADMIN_PATH = ApiConstants.USERS + "/admin";
+
+  private final JwtSecurityConfigurer jwtSecurity;
 
   @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http.csrf(AbstractHttpConfigurer::disable)
-        .cors(AbstractHttpConfigurer::disable)
-        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+  SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    jwtSecurity
+        .apply(http)
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
-                    .requestMatchers(
-                        "/api/v1/users/internal/**", "/api/v1/users/neo4j/**", "/error")
+                    .requestMatchers(ApiConstants.SWAGGER_WHITELIST)
                     .permitAll()
-                    .requestMatchers("/v3/api-docs/**", "/swagger-ui/**")
+                    .requestMatchers("/error", "/actuator/health/**")
                     .permitAll()
+                    .requestMatchers(ADMIN_PATH + "/**")
+                    .hasRole(SecurityConstants.ROLE_ADMIN)
                     .anyRequest()
-                    .authenticated())
-        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
+                    .authenticated());
     return http.build();
   }
 }

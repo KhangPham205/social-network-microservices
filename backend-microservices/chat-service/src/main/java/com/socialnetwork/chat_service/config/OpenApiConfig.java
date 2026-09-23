@@ -13,29 +13,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
+  private static final String SECURITY_SCHEME = "bearerAuth";
+
   @Bean
   public OpenAPI chatServiceOpenAPI() {
-    // Tên của scheme bảo mật (dùng nội bộ trong code)
-    String securitySchemeName = "bearerAuth";
-
     return new OpenAPI()
-        // Thêm cấu hình Server để Gateway có thể định tuyến đúng (Rất quan trọng trong
-        // Microservices)
+        // Relative server URL so the aggregated Swagger UI on the gateway routes correctly.
         .servers(List.of(new Server().url("/").description("Default Server URL")))
         .info(
             new Info()
                 .title("Chat Service API")
-                .description("Tài liệu API cho module Chat (Chat Service)")
+                .description("Conversations, messages and the chat WebSocket")
                 .version("v1.0.0"))
-        // Yêu cầu bảo mật cho toàn bộ các API
-        .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
-        // Định nghĩa ổ khóa JWT
+        .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME))
         .components(
             new Components()
                 .addSecuritySchemes(
-                    securitySchemeName,
+                    SECURITY_SCHEME,
                     new SecurityScheme()
-                        .name(securitySchemeName)
+                        .name(SECURITY_SCHEME)
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
                         .bearerFormat("JWT")));

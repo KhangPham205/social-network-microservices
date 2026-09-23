@@ -38,3 +38,12 @@ com.socialnetwork.<svc>
 - `mvn test` xanh (offline).
 - Không còn `TODO` gây lỗi runtime, không code comment-out, không `System.out`.
 - Đổi contract/endpoint/env → cập nhật `docs/` tương ứng và `CLAUDE.md` nếu ảnh hưởng quy ước.
+
+## Bẫy đã gặp với Spring Boot 4 (ghi lại để khỏi mất thời gian)
+
+1. **Kafka cần `spring-boot-starter-kafka`, không phải `org.springframework.kafka:spring-kafka`.** Boot 4 chuyển auto-configuration Kafka sang artifact riêng, chỉ được kéo vào bởi starter. Khai báo artifact thô thì `spring.kafka.*` **không bind**, không có `KafkaTemplate`, và mọi `@KafkaListener` im lặng không chạy. Bốn service từng dính lỗi này.
+2. **`@WebMvcTest` + `@WithMockUser` không đủ.** Boot 4 không còn gắn cấu hình MockMvc của Spring Security vào slice, nên mọi request bị coi là ẩn danh và trả 401. Cách dùng trong repo: `.with(testSecurityContext())` trên request builder, hoặc dựng MockMvc thủ công với `MockMvcBuilders.webAppContextSetup(ctx).apply(springSecurity())`.
+3. **`HttpComponentsClientHttpRequestFactory.setConnectTimeout(Duration)` đã bị bỏ** trong Spring Framework 7. Đặt connect timeout qua `ConnectionConfig` trên `PoolingHttpClientConnectionManager`; `responseTimeout` vẫn nằm ở `RequestConfig`.
+4. **Lombok `@RequiredArgsConstructor` không chuyển `@Value` trên field sang constructor sinh ra.** Field `final` mang `@Value` sẽ khiến Spring đi tìm *bean* đúng kiểu đó và startup thất bại. Viết constructor tường minh và đặt `@Value` trên tham số.
+5. **`rsql-jpa 6.0.33` không tương thích Hibernate 7 khi chạy H2.** `RSQLJPAAutoConfiguration` dò `DerbyDialect` vốn đã bị Hibernate 7 gỡ bỏ, gây `NoClassDefFoundError`. PostgreSQL được kiểm tra trước nên môi trường thật an toàn; profile test ghim `spring.jpa.database-platform` hoặc loại trừ auto-configuration đó.
+6. **Xoá file nguồn không xoá `target/classes`.** Class cũ vẫn bị component scan và gây `BeanDefinitionOverrideException` hoặc `NoClassDefFoundError`. Sau khi xoá class, luôn `mvn clean` (hoặc `rm -rf <module>/target`) trước khi chạy lại.

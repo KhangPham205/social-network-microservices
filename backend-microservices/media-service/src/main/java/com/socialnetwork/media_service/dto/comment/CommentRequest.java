@@ -1,15 +1,19 @@
 package com.socialnetwork.media_service.dto.comment;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import org.springframework.lang.Nullable;
 import org.springframework.web.multipart.MultipartFile;
 
 @Data
 public class CommentRequest {
-  private Long postId;
 
-  @Nullable private Long parentId;
+  @NotNull private Long postId;
 
-  private String content;
+  /** Id of the comment being replied to; null for a root comment. */
+  private Long parentId;
+
+  @NotBlank private String content;
+
   private MultipartFile mediaFile;
 }

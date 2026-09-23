@@ -1,13 +1,17 @@
 package com.socialnetwork.chat_service.dto;
 
+import com.socialnetwork.chat_service.enums.ConversationRole;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 @Builder
 public class ParticipantDto {
+
   private Long id;
   private String displayName;
   private String avatarUrl;
-  private String role;
+  private ConversationRole role;
 }

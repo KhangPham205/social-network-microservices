@@ -1,24 +1,73 @@
 server:
-  port: 8082
+  port: ${SERVER_PORT:8082}
+  forward-headers-strategy: framework
 
 spring:
   application:
     name: user-service
-  profiles:
-    active: dev
-  servlet:
-    multipart:
-      enabled: true
-  swagger-ui:
-    path: /swagger-ui.html
-    server:
-      url: http://localhost:8080
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/user_db}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: true
+
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:password}
+
+  data:
+    neo4j:
+      database: neo4j
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+    consumer:
+      group-id: user-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.trusted.packages: com.socialnetwork.common.events
+        spring.json.use.type.headers: true
+    listener:
+      ack-mode: record
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${server.port}
 
+jwt:
+  secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-0123456789abcdef}
+
+app:
+  internal:
+    token: ${INTERNAL_API_TOKEN:dev-only-internal-token-change-me}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

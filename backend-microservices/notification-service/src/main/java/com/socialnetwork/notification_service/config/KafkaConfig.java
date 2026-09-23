@@ -2,7 +2,7 @@ package com.socialnetwork.notification_service.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -20,9 +20,10 @@ public class KafkaConfig {
 
   /** Retries transient failures, then publishes the record to {@code <topic>.DLT}. */
   @Bean
-  public CommonErrorHandler kafkaErrorHandler(KafkaTemplate<?, ?> template) {
+  public CommonErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> template) {
     var recoverer = new DeadLetterPublishingRecoverer(template);
-    var handler = new DefaultErrorHandler(recoverer, new FixedBackOff(RETRY_INTERVAL_MS, MAX_RETRIES));
+    var handler =
+        new DefaultErrorHandler(recoverer, new FixedBackOff(RETRY_INTERVAL_MS, MAX_RETRIES));
     handler.addNotRetryableExceptions(IllegalArgumentException.class);
     return handler;
   }

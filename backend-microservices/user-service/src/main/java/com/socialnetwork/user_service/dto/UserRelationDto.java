@@ -1,16 +1,26 @@
 package com.socialnetwork.user_service.dto;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+/** A profile plus how the current viewer is related to it. */
 @Data
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class UserRelationDto extends UserProfileDto {
-  private boolean isFollowing; // mình đang follow họ
-  private boolean isFollowedBy; // họ follow lại mình
+  /** The viewer follows this user. */
+  private boolean isFollowing;
+
+  /** This user follows the viewer back. */
+  private boolean isFollowedBy;
+
   private FriendshipResponse friendship;
-  private int mutualFriendsCount; // số bạn chung
+
+  /** Number of friends the viewer and this user have in common. */
+  private int mutualFriendsCount;
 }

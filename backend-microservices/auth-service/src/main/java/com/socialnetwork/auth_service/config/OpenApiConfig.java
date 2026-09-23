@@ -13,29 +13,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
+  private static final String BEARER_AUTH = "bearerAuth";
+
   @Bean
   public OpenAPI authServiceOpenAPI() {
-    // Tên của scheme bảo mật (dùng nội bộ trong code)
-    String securitySchemeName = "bearerAuth";
-
     return new OpenAPI()
-        // Thêm cấu hình Server để Gateway có thể định tuyến đúng (Rất quan trọng trong
-        // Microservices)
-        .servers(List.of(new Server().url("/").description("Default Server URL")))
+        // Relative server URL so the definition stays valid behind the API gateway.
+        .servers(List.of(new Server().url("/").description("Default server URL")))
         .info(
             new Info()
                 .title("Auth Service API")
-                .description("Tài liệu API cho module Xác thực (Auth Service)")
+                .description("Credentials, RBAC, JWT issuing and OTP e-mail")
                 .version("v1.0.0"))
-        // Yêu cầu bảo mật cho toàn bộ các API
-        .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
-        // Định nghĩa ổ khóa JWT
+        .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH))
         .components(
             new Components()
                 .addSecuritySchemes(
-                    securitySchemeName,
+                    BEARER_AUTH,
                     new SecurityScheme()
-                        .name(securitySchemeName)
+                        .name(BEARER_AUTH)
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
                         .bearerFormat("JWT")));

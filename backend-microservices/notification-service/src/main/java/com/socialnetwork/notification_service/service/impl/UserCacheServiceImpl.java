@@ -36,7 +36,9 @@ public class UserCacheServiceImpl implements UserCacheService {
             .filter(s -> userId.equals(s.id()))
             .findFirst()
             .orElseThrow(
-                () -> new ResourceNotFoundException("User " + userId + " not found in user-service"));
+                () ->
+                    new ResourceNotFoundException(
+                        "User " + userId + " not found in user-service"));
     return userCacheRepository.save(
         UserCache.builder()
             .id(summary.id())

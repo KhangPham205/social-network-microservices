@@ -1,25 +1,28 @@
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/social_network}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:123456}
-    driver-class-name: org.postgresql.Driver
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
+  neo4j:
+    uri: ${NEO4J_URI}
+    authentication:
+      username: ${NEO4J_USERNAME}
+      password: ${NEO4J_PASSWORD}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URL}
 
 jwt:
-  # Cực kỳ quan trọng: Giấu chuỗi Secret này đi
-  secret: ${JWT_SECRET:chuoi_secret_dung_de_test_o_local_dai_dai_mot_chut}
-  expiration: 86400000
-  refresh:
-    expiration: 604800000
+  secret: ${JWT_SECRET}
 
-
+app:
+  internal:
+    token: ${INTERNAL_API_TOKEN}
